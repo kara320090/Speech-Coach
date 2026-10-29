@@ -1,0 +1,212 @@
+import { expect, test, type Page } from "@playwright/test"
+
+const clock = (t: string) => {
+  const m = t.match(/(\d+):(\d{2})/)!
+  return Number(m[1]) * 60 + Number(m[2])
+}
+
+async function startPractice(page: Page, { seconds = "30", video = false, speech = false, extra = async () => {} } = {}) {
+  await page.goto("/")
+  await page.getByLabel("목표 시간 초").fill(seconds)
+  if (video) await page.getByLabel("웹캠 영상도 기록").check()
+  if (speech) await page.getByLabel("음성 인식으로 말하기 속도").check()
+  await extra()
+  await page.getByRole("button", { name: "연습 시작" }).click()
+  await expect(page.getByRole("button", { name: "연습 종료" })).toBeVisible()
+}
+
+test.describe("가짜 마이크·웹캠으로 기록하고 구간으로 이동", () => {
+  test("소리+웹캠 영상 기록 → 긴 침묵 표시 → 눌러서 영상 구간으로 이동", async ({ page }) => {
+    await startPractice(page, { seconds: "20", video: true })
+    await expect(page.getByTestId("rec-status")).toContainText("소리 기록 중")
+    await expect(page.getByTestId("rec-status")).toContainText("영상 기록 중")
+    await expect(page.getByTestId("elapsed")).toHaveText("0:14")
+    await page.getByRole("button", { name: "연습 종료" }).click()
+
+    const result = page.getByRole("region", { name: "연습 결과" })
+    await expect(result).toBeVisible()
+    // 긴 침묵: 6~11초 무음 → 약 5초
+    const item = page.getByRole("list", { name: "검토할 구간 목록" }).getByRole("listitem").filter({ hasText: "긴 침묵" })
+    await expect(item).toHaveCount(1)
+    const start = Number(await item.getByRole("button").getAttribute("data-start"))
+    expect(start).toBeGreaterThan(5)
+    expect(start).toBeLessThan(7.5)
+    const measured = await item.innerText()
+    const len = Number(measured.match(/측정값: ([\d.]+)초/)![1])
+    expect(len).toBeGreaterThan(4)
+    expect(len).toBeLessThan(6.5)
+    expect(measured).toContain("근거:")
+
+    // 영상 플레이어: 길이를 알 수 있어야 이동한다
+    const video = page.locator("video#player")
+    await expect(video).toBeVisible()
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => Number.isFinite(v.duration) && v.duration > 10)).toBe(true)
+    await item.getByRole("button").click()
+    await expect(page.locator("#seek-status")).toContainText("재생 위치를")
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThanOrEqual(start - 0.3)
+    const at = await video.evaluate((v: HTMLVideoElement) => v.currentTime)
+    expect(at).toBeLessThan(start + 3)
+    const dur = await video.evaluate((v: HTMLVideoElement) => v.duration)
+    expect(Math.abs(dur - 15)).toBeLessThan(2.5) // 연습한 길이와 비슷해야 한다
+  })
+
+  test("소리만 기록 → 긴 침묵 → 눌러서 녹음 구간으로 이동", async ({ page }) => {
+    await startPractice(page, { seconds: "20" })
+    await expect(page.getByTestId("rec-status")).toContainText("소리 기록 중")
+    await expect(page.getByTestId("elapsed")).toHaveText("0:13")
+    await page.getByRole("button", { name: "연습 종료" }).click()
+    await expect(page.getByRole("region", { name: "연습 결과" })).toBeVisible()
+    const item = page.getByRole("list", { name: "검토할 구간 목록" }).getByRole("listitem").filter({ hasText: "긴 침묵" })
+    await expect(item).toHaveCount(1)
+    const start = Number(await item.getByRole("button").getAttribute("data-start"))
+    expect(start).toBeGreaterThan(5)
+    expect(start).toBeLessThan(7.5)
+    const audio = page.locator("audio#player")
+    await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.duration > 10)).toBe(true)
+    await item.getByRole("button").click()
+    await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThanOrEqual(start - 0.3)
+    expect(await audio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeLessThan(start + 3)
+  })
+
+  test("일시정지 시간은 연습 시간과 기록에서 빠진다", async ({ page }) => {
+    await startPractice(page, { seconds: "30" })
+    await expect(page.getByTestId("elapsed")).toHaveText("0:02")
+    await page.getByRole("button", { name: "일시정지" }).click()
+    await expect(page.getByRole("button", { name: "다시 시작" })).toBeVisible()
+    await page.waitForTimeout(3000)
+    const frozen = await page.getByTestId("elapsed").innerText()
+    expect(clock(frozen)).toBeLessThanOrEqual(3)
+    await page.getByRole("button", { name: "다시 시작" }).click()
+    await expect(page.getByTestId("elapsed")).toHaveText("0:05")
+    await page.getByRole("button", { name: "연습 종료" }).click()
+    const total = clock(await page.getByTestId("total").innerText())
+    expect(total).toBeGreaterThanOrEqual(5)
+    expect(total).toBeLessThanOrEqual(7) // 3초 멈춘 시간이 들어가면 8초 이상이 된다
+    // 녹음 길이도 연습 시간과 맞아야 한다(멈춘 동안 기록하지 않음)
+    const audio = page.locator("audio#player")
+    await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.duration)).toBeGreaterThan(total - 1.5)
+    expect(await audio.evaluate((a: HTMLAudioElement) => a.duration)).toBeLessThan(total + 1.5)
+  })
+})
+
+test.describe("음성 인식(가짜 구현): 속도·반복 표현 분석 흐름", () => {
+  test("인식 결과가 들어오면 실시간 속도·평균 속도·반복 표현이 나온다", async ({ page }) => {
+    // 브라우저의 SpeechRecognition을 가짜로 바꿔 인식 결과가 들어오는 상황을 만든다. 실제 음성 인식 서비스를 쓴 검사가 아니다.
+    await page.addInitScript(() => {
+      const script: Array<[number, number, string, boolean]> = [
+        [500, 0, "그 그 그러니까 오늘 발표를", false],
+        [1500, 0, "그 그 그러니까 오늘 발표를 시작하겠습니다", true],
+        [3000, 1, "음악 음악 음악 이야기를", false],
+        [5000, 1, "음악 음악 음악 이야기를 먼저 해 보겠습니다", true],
+        [8000, 2, "다음으로 연습이 왜 필요한지 말씀드리겠습니다", true],
+        [11000, 3, "마지막으로 정리하겠습니다 감사합니다", true],
+      ]
+      class FakeRec {
+        lang = ""
+        continuous = false
+        interimResults = false
+        onresult: ((e: unknown) => void) | null = null
+        onerror: ((e: unknown) => void) | null = null
+        onend: (() => void) | null = null
+        timers: number[] = []
+        start() {
+          const results: Array<{ 0: { transcript: string }; isFinal: boolean }> = []
+          for (const [at, idx, text, fin] of script) {
+            this.timers.push(
+              window.setTimeout(() => {
+                results[idx] = { 0: { transcript: text }, isFinal: fin }
+                this.onresult?.({ resultIndex: idx, results })
+              }, at),
+            )
+          }
+        }
+        stop() {
+          this.timers.forEach(clearTimeout)
+          setTimeout(() => this.onend?.(), 0)
+        }
+      }
+      ;(window as any).webkitSpeechRecognition = FakeRec
+      ;(window as any).SpeechRecognition = FakeRec
+    })
+    await startPractice(page, {
+      seconds: "20",
+      speech: true,
+      extra: async () => {
+        await page.getByLabel("최소(분당 음절)").fill("100")
+        await page.getByLabel("최대(분당 음절)").fill("200")
+      },
+    })
+    await expect(page.getByTestId("speed")).toContainText("측정 중")
+    await expect(page.getByTestId("elapsed")).toHaveText("0:12")
+    await expect(page.getByTestId("speed")).toContainText("음절/분")
+    await expect(page.getByTestId("speed")).toContainText(/목표 (범위 안|최대|최소)/)
+    await page.getByRole("button", { name: "연습 종료" }).click()
+
+    const avg = page.getByTestId("avg-speed")
+    await expect(avg).toContainText("음절/분")
+    await expect(avg).toContainText("한글 음절")
+    const items = page.getByRole("list", { name: "검토할 구간 목록" })
+    await expect(items).toContainText('같은 말을 이어서 반복: "그"')
+    await expect(items).toContainText('"음악"')
+    await expect(page.getByText("인식된 글 보기")).toBeVisible()
+    // 숫자는 화면의 계산 근거와 맞아야 한다: 한글 음절 수 ÷ 연습 시간(분)
+    const text = await avg.innerText()
+    const rate = Number(text.match(/(\d+) 음절\/분/)![1])
+    const syll = Number(text.match(/한글 음절 (\d+)개/)![1])
+    const totalSec = clock(await page.getByTestId("total").innerText())
+    expect(Math.abs(rate - Math.round(syll / (totalSec / 60)))).toBeLessThanOrEqual(1)
+  })
+})
+
+test.describe("실패 상황", () => {
+  test("음성 인식을 지원하지 않는 브라우저: 속도는 측정 불가로 표시한다", async ({ page }) => {
+    await page.addInitScript(() => {
+      delete (window as any).SpeechRecognition
+      delete (window as any).webkitSpeechRecognition
+    })
+    await page.goto("/")
+    await expect(page.getByLabel("음성 인식으로 말하기 속도")).toBeDisabled()
+    await expect(page.getByText("이 브라우저는 음성 인식을 지원하지 않아서")).toBeVisible()
+    await page.getByLabel("목표 시간 초").fill("20")
+    await page.getByRole("button", { name: "연습 시작" }).click()
+    await expect(page.getByTestId("speed")).toContainText("측정 안 함")
+    await page.getByRole("button", { name: "연습 종료" }).click()
+    await expect(page.getByTestId("avg-speed")).toContainText("측정 못 함")
+  })
+
+  test("기록 저장에 실패해도 결과는 보이고 저장 실패를 알린다", async ({ page }) => {
+    await page.addInitScript(() => {
+      indexedDB.open = () => {
+        throw new Error("저장소를 열 수 없는 테스트 상황")
+      }
+    })
+    await startPractice(page, { seconds: "20" })
+    await expect(page.getByTestId("elapsed")).toHaveText("0:02")
+    await page.getByRole("button", { name: "연습 종료" }).click()
+    await expect(page.getByRole("region", { name: "연습 결과" })).toBeVisible()
+    await expect(page.getByText("기록을 이 기기에 저장하지 못했어요")).toBeVisible()
+    await expect(page.getByTestId("total")).toBeVisible()
+  })
+})
+
+test("소리를 기록한 두 연습: 같은 조건 비교에 검토 구간 수가 나란히 나온다", async ({ page }) => {
+  await startPractice(page, { seconds: "20" })
+  await expect(page.getByTestId("elapsed")).toHaveText("0:12")
+  await page.getByRole("button", { name: "연습 종료" }).click()
+  await expect(page.getByTestId("no-compare")).toBeVisible()
+  await page.getByRole("button", { name: "같은 조건으로 다시 연습" }).click()
+  await page.getByRole("button", { name: "연습 시작" }).click()
+  await expect(page.getByTestId("elapsed")).toHaveText("0:12")
+  await page.getByRole("button", { name: "연습 종료" }).click()
+  const table = page.getByTestId("compare-table")
+  const silenceRow = table.getByRole("row", { name: /검토 구간: 긴 침묵/ })
+  await expect(silenceRow).toBeVisible()
+  const cells = await silenceRow.getByRole("cell").allInnerTexts()
+  expect(cells[1]).toMatch(/^\d+개$/)
+  expect(cells[2]).toMatch(/^\d+개$/)
+  const speedRow = table.getByRole("row", { name: /평균 속도/ })
+  await expect(speedRow).toContainText("비교 불가")
+  await expect(table).not.toContainText("점수")
+})
