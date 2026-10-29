@@ -3,10 +3,15 @@ import { fileURLToPath } from "node:url"
 import { createServer } from "../server.js"
 import { assertPortFree, buildWorkerSpecs, createManagedRuntime, readRuntimeConfig } from "../server/managed-runtime.js"
 
-// 기동 순서: 웹 서버를 먼저 열어 /__health와 기본 연습(S1–S4·S9)을 바로 제공하고, 자체 모델은 그 뒤에 띄운다.
-// 모델·실행기 파일이 없거나 기동에 실패해도 서버는 "모델 미연결" 상태로 계속 동작한다(주최 측 실행은 /__health를 2분 안에 기다린다).
+// 기동 순서: 웹 서버 포트를 먼저 열고 자체 모델을 뒤에서 띄운다.
+// /__health는 모델이 준비되거나(ready) 실패·시간 초과가 확정될 때까지 503(starting)으로 답하고, 그 뒤 200을 준다.
+// 그래서 모델이 정상이면 예전과 같이 health=모델 준비이고, 모델 파일이 없거나 죽어도 서버는 "모델 미연결" 상태로 기본 연습(S1–S4·S9)을 제공한다.
+// 주최 측 실행은 기동 후 2분 안에 /__health 200을 기다리므로 대기 상한은 그 안에 둔다.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+const HEALTH_GATE_MAX_MS = 100_000
 let runtime, server, shuttingDown = false
+const gate = { open: false }
+function openGate(reason) { if (!gate.open) { gate.open = true; console.log(`[self-hosted] health 열림: ${reason}`) } }
 async function shutdown() {
   if (shuttingDown) return
   shuttingDown = true
@@ -41,19 +46,26 @@ try {
       onState: (name, state) => console.log(`[self-hosted] ${name}: ${state}`),
     })
   }
-  // 1) 웹 서버 먼저
-  server = createServer({ env, runtime })
+  // 1) 웹 서버 먼저 (health는 gate가 열릴 때까지 503)
+  server = createServer({ env, runtime, healthReady: () => gate.open })
   server.once("error", async () => { console.error("백엔드 실행 포트를 확인해 주세요."); await shutdown(); process.exitCode = 1 })
   await new Promise(resolve => server.listen(port, "0.0.0.0", resolve))
-  console.log(`백엔드가 준비됐어요: http://localhost:${port}/ (자체 AI: ${config ? "시작 중" : "꺼짐"})`)
-  // 2) 자체 모델은 뒤에서. 실패해도 서버는 유지한다.
+  console.log(`백엔드 포트를 열었어요: http://localhost:${port}/ (자체 AI: ${config ? "시작 중" : "꺼짐"})`)
+  // 2) 자체 모델은 뒤에서. 준비·실패·시간 초과 중 먼저 오는 것으로 health를 연다.
   if (runtime && !shuttingDown) {
+    const cap = Math.min(HEALTH_GATE_MAX_MS, Number(config.startupTimeoutMs || 90_000) + 10_000)
+    const timer = setTimeout(() => openGate(`대기 상한 ${Math.round(cap / 1000)}초 경과, 모델은 계속 시작 중`), cap)
+    timer.unref?.()
     runtime.start()
-      .then(() => { if (!shuttingDown) console.log(`자체 AI가 준비됐어요: http://localhost:${port}/coach.html`) })
+      .then(() => { clearTimeout(timer); openGate("자체 AI 준비 완료"); if (!shuttingDown) console.log(`자체 AI가 준비됐어요: http://localhost:${port}/coach.html`) })
       .catch(async (error) => {
+        clearTimeout(timer)
         console.error(`[self-hosted] 자체 AI 기동 실패, 기본 연습만 제공해요: ${error?.message || error}`)
         try { await runtime.stop() } catch {}
+        openGate("자체 AI 기동 실패")
       })
+  } else {
+    openGate("자체 AI 없이 기본 연습 제공")
   }
 } catch (error) {
   console.error(error.code === "configuration" || error.code === "port-in-use" ? error.message : "백엔드를 시작하지 못했어요.")

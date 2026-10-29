@@ -61,7 +61,7 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks)
 }
 
-export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits, runtime, agentPublicKey } = {}) {
+export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits, runtime, agentPublicKey, healthReady = () => true } = {}) {
   const agentMode = env.AI_EXECUTION_MODE === "agent" || env.RENDER === "true"
   const broker = agentMode ? createAgentBroker(agentPublicKey || JSON.parse(readFileSync(new URL("./server/agent-public-key.json", import.meta.url), "utf8")).publicKey) : null
   const inferenceEnv = broker ? { ...env, AI_PROVIDER: "local", LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
@@ -143,8 +143,10 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         return res.end()
       }
       if (url.pathname === "/__health") {
-        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...HEADERS })
-        return res.end(JSON.stringify({ status: "ok", releaseId }))
+        // 자체 AI를 함께 띄우는 컨테이너에서는 모델이 준비되거나 실패가 확정될 때까지 503(starting)으로 답한다(start.mjs의 healthReady).
+        const ready = healthReady() !== false
+        res.writeHead(ready ? 200 : 503, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...HEADERS })
+        return res.end(JSON.stringify({ status: ready ? "ok" : "starting", releaseId }))
       }
       let rel = decodeURIComponent(url.pathname)
       if (rel.endsWith("/")) rel += "index.html"
