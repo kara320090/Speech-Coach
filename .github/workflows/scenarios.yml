@@ -1,0 +1,65 @@
+# 루프톤 시나리오 검사. 주최 측 실행과 같은 순서로 docker compose 기동 → /__health 대기 → Playwright 실행.
+# .github/workflows/scenarios.yml로 복사한다. compose 기동·/__health 응답·시나리오 E2E를 검사한다.
+# 주최 측 실행은 e2e/playwright.config.ts 대신 같은 화면 크기·순서의 자체 설정으로 돈다. 여기서 통과하는지로 주최 측 실행 실행을 미리 확인한다.
+# AI 기능을 쓰면 학생이 GitHub 저장소 Settings → Secrets and variables → Actions에 AI_GATEWAY_API_KEY를 직접 넣는다(Agent는 키를 다루지 않는다).
+# 실제 AI 호출이 팀 예산에서 쓰이므로 기본 브랜치 push와 수동 실행(Actions 탭 → Run workflow)에서만 돈다.
+# spec이 하나도 없으면 E2E 단계는 비어 있는 채로 통과하니(--pass-with-no-tests), spec을 넣은 뒤의 결과를 본다.
+name: scenarios
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start app and database
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: RELEASE_ID="$GITHUB_SHA" docker compose up -d --build
+      - name: Wait for /__health
+        run: |
+          # 주최 측 실행은 기동을 시작한 때부터 2분을 기다린다. 여기서도 같은 시간 안에 떠야 한다.
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/__health; then exit 0; fi
+            sleep 2
+          done
+          echo "/__health가 120초 안에 200을 주지 않았다"
+          docker compose logs app
+          exit 1
+      - name: Read seed account from docker-compose.yml
+        run: |
+          config="$(docker compose config --format json)"
+          email="$(echo "$config" | jq -r '.services.app.environment.SEED_USER_EMAIL // empty')"
+          password="$(echo "$config" | jq -r '.services.app.environment.SEED_USER_PASSWORD // empty')"
+          # 로그인이 없는 서비스면 시드 계정이 없어도 된다.
+          if [ -n "$email" ] && [ -n "$password" ]; then
+            echo "E2E_USER_EMAIL=$email" >> "$GITHUB_ENV"
+            echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Run scenario E2E
+        working-directory: e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+          npx playwright test --pass-with-no-tests --forbid-only
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+      - name: Stop containers
+        if: always()
+        run: |
+          docker compose logs app --tail 200
+          docker compose down -v
