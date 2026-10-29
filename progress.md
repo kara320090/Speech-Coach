@@ -5,9 +5,9 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 ## 현재 상태
 
 - 실제 서비스 저장소 폴더: https://github.com/kara320090/Speech-Coach (기본 브랜치 main). 학생 PC 저장 공간 부족으로 로컬 clone 없이 GitHub 웹 화면으로 파일을 올림
-- 현재 단계 / 다음 행동: 학생 지시(2026-10-29)로 문서 갱신 → 구현 → 검증을 한 번에 진행함. 다음: GitHub Actions 결과·공개 배포(Vercel, 학생 로그인 필요)·학생 확인 사항 정리
+- 현재 단계 / 다음 행동: 학생 지시(2026-10-29)로 문서 갱신 → 구현 → 검증을 한 번에 진행함. GitHub Actions scenarios 통과 확인(#1 commit 41ce0da, #2 commit de3e244). 다음: 공개 배포(Vercel, 학생 로그인 필요)·학생 확인 사항 정리
 - 학생에게 확인할 내용: ① 실제 발표 종료 시간·감점 여부(미확인, 단정 안 함) ② 10시간에 포함된 "여러 준비 활동"의 구체 내용(학생이 말하지 않아 "대사 암기 등 발표 준비"로만 기록) ③ docs/scenarios.yaml의 platform=desktop은 Agent가 학생이 말한 연습 장면(집·빈 강의실, 웹캠 녹화)에서 정한 값이라 학생 확인 필요 ④ 2026-10-29 방향 변경(해법 경로 2도 구현)은 종이 원본이 아니라 이때 새로 정한 결정임
-- 제한: 실제 마이크·웹캠·브라우저 음성 인식 서비스로는 검증하지 못함(가짜 장치·가짜 SpeechRecognition으로만 검증). docker daemon이 없는 작업 공간이라 Dockerfile 빌드는 직접 확인하지 못함(GitHub Actions 결과로 확인 필요). 서비스 AI API(AI_GATEWAY_API_KEY)는 쓰지 않음
+- 제한: 실제 마이크·웹캠·브라우저 음성 인식 서비스로는 검증하지 못함(가짜 장치·가짜 SpeechRecognition으로만 검증). 이 작업 공간에는 docker daemon이 없어 직접 돌리지 못했고, Dockerfile 빌드·docker compose up·/__health·S1~S4는 GitHub Actions 실행(#1, #2)에서 통과를 확인함. 서비스 AI API(AI_GATEWAY_API_KEY)는 쓰지 않음
 
 ## 1. GitHub 준비
 
@@ -47,7 +47,7 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 
 ## 3. 최소 화면 docker 실행·CI·첫 배포
 
-- [x] 설계에 맞는 최소 화면과 서버 실행 구성 준비, Dockerfile 작성(빌드는 Dockerfile에서 끝내고 시작 명령은 서버 실행만) — 화면·서버·Dockerfile 작성, 로컬 node 실행으로 검증, docker 빌드는 이 작업 공간에서 못 해 GitHub Actions 확인 대기
+- [x] 설계에 맞는 최소 화면과 서버 실행 구성 준비, Dockerfile 작성(빌드는 Dockerfile에서 끝내고 시작 명령은 서버 실행만) — 화면·서버·Dockerfile 작성, 로컬 node 실행으로 검증, docker 빌드는 이 작업 공간에서 못 하고 GitHub Actions #1·#2 통과로 확인
 - [ ] docker-compose.example.yml을 docker-compose.yml로 복사: app·db, app만 ports "3000:3000", 앱은 컨테이너 안 3000에서 받음, 앱 설정에 localhost:3000 같은 절대 주소 없음
 - [ ] app 말고는 ports·container_name이 없고, 어느 서비스에도 env_file 없음
 - [ ] 환경변수 이름 그대로(RELEASE_ID·SEED_USER_*·AI_GATEWAY_API_KEY), 시드 계정 값은 `${}` 없이 직접 적음
