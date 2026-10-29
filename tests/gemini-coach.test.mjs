@@ -4,7 +4,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { createServer } from "../server.js"
 import { createCoach } from "../server/coach-provider.js"
-import { classifyGeminiError, createGeminiClient, parseGeminiResponse, retryAfterSeconds } from "../server/gemini-client.js"
+import { checkModelAccess, classifyGeminiError, createGeminiClient, parseGeminiResponse, providerDetail, retryAfterSeconds } from "../server/gemini-client.js"
 
 // 기본 검사 중에는 진짜 네트워크로 Google을 부르지 못하게 막는다(키가 환경에 있어도).
 const realFetch = globalThis.fetch
@@ -308,6 +308,57 @@ test("공급자 선택: 기본은 local, 잘못된 값은 설정 오류(다른 �
   assert.equal((await weird.status()).reason, "invalid-model")
   assert.equal(f.calls.length, 1)
   assert.throws(() => createGeminiClient({ apiKey: KEY, model: "a/b" }))
+})
+
+test("진단 정보: HTTP 상태와 Google 열거 코드만 남기고 메시지 원문·자유 문자열은 버린다", () => {
+  assert.deepEqual(providerDetail(404, { error: { code: 404, status: "NOT_FOUND", message: `models/gemini-2.5-flash is not found ${KEY}` } }), { httpStatus: 404, providerStatus: "NOT_FOUND", providerReason: null })
+  assert.deepEqual(providerDetail(400, { error: { status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID", metadata: { key: KEY } }] } }), { httpStatus: 400, providerStatus: "INVALID_ARGUMENT", providerReason: "API_KEY_INVALID" })
+  assert.deepEqual(providerDetail(500, { error: { status: "not an enum <script>", details: [{ reason: `project 123 ${KEY}` }] } }), { httpStatus: 500, providerStatus: null, providerReason: null })
+  assert.deepEqual(providerDetail(502, null), { httpStatus: 502, providerStatus: null, providerReason: null })
+})
+
+test("상태 API의 lastError: 정제된 코드·HTTP 상태·안내만 공개하고, 원문 메시지·키·요청 내용은 없다. 성공하면 지운다", async () => {
+  const secretText = "비공개 가상 대본 문장"
+  const f = fakeFetch((n) => (n === 1 ? geminiErr(404, { code: 404, status: "NOT_FOUND", message: `models/gemini-2.5-flash is not found for API version v1beta ${KEY}` }) : geminiOk(OUT.question)))
+  await withServer({ env: env(), fetchImpl: f }, async (base) => {
+    const res = await post(base, sample({ task: "question", script: `${SCRIPT} ${secretText}` }))
+    assert.deepEqual([res.status, (await res.json()).error], [502, "provider-model"])
+    const raw = await (await fetch(`${base}/api/model-status`)).text()
+    const st = JSON.parse(raw)
+    assert.deepEqual([st.connection, st.reason], ["failed", "provider-model"])
+    assert.deepEqual(Object.keys(st.lastError).sort(), ["at", "code", "hint", "httpStatus", "providerReason", "providerStatus"])
+    assert.deepEqual([st.lastError.code, st.lastError.httpStatus, st.lastError.providerStatus], ["provider-model", 404, "NOT_FOUND"])
+    assert.match(st.lastError.hint, /gemini:check-models/)
+    for (const leak of [KEY, "is not found", "API version", secretText, SCRIPT]) assert.ok(!raw.includes(leak), `상태 응답에 '${leak}'가 있으면 안 된다`)
+  })
+  // 성공하면 lastError를 지운다
+  let t = 0
+  const g = fakeFetch((n) => (n === 1 ? geminiErr(503, { status: "UNAVAILABLE" }) : geminiOk(OUT.question)))
+  const coach = createCoach({ env: env(), fetchImpl: g, now: () => (t += 10) })
+  await assert.rejects(coach.run(sample({ task: "question" }), signal()), { code: "provider-unavailable" })
+  assert.equal((await coach.status()).lastError.providerStatus, "UNAVAILABLE")
+  await coach.run(sample({ task: "question", requestId: "r2" }), signal())
+  assert.equal((await coach.status()).lastError, null)
+})
+
+test("모델 접근 확인은 models.get(GET)만 쓰고 생성 요청을 보내지 않는다", async () => {
+  const f = fakeFetch((n, url) => {
+    if (url.endsWith("/models/gemini-3.8-flash")) return new Response(JSON.stringify({ name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent", "countTokens"] }), { status: 200 })
+    if (url.endsWith("/models/gemini-embed-test")) return new Response(JSON.stringify({ name: "models/gemini-embed-test", supportedGenerationMethods: ["embedContent"] }), { status: 200 })
+    if (url.endsWith("/models/gemini-2.5-flash")) return geminiErr(404, { code: 404, status: "NOT_FOUND", message: `not found ${KEY}` })
+    return geminiErr(403, { code: 403, status: "PERMISSION_DENIED" })
+  })
+  assert.deepEqual(await checkModelAccess({ apiKey: KEY, model: "gemini-3.8-flash", fetchImpl: f }), { model: "gemini-3.8-flash", httpStatus: 200, providerStatus: null, providerReason: null, accessible: true, generateContent: true })
+  assert.equal((await checkModelAccess({ apiKey: KEY, model: "gemini-embed-test", fetchImpl: f })).generateContent, false)
+  assert.deepEqual(await checkModelAccess({ apiKey: KEY, model: "gemini-2.5-flash", fetchImpl: f }), { model: "gemini-2.5-flash", httpStatus: 404, providerStatus: "NOT_FOUND", providerReason: null, accessible: false, generateContent: null })
+  assert.equal((await checkModelAccess({ apiKey: KEY, model: "gemini-3.5-flash-lite", fetchImpl: f })).providerStatus, "PERMISSION_DENIED")
+  for (const c of f.calls) {
+    assert.equal(c.init.method, "GET")
+    assert.equal(c.init.body, undefined)
+    assert.ok(!c.url.includes(":generateContent") && !c.url.includes(KEY))
+    assert.equal(c.init.headers["x-goog-api-key"], KEY)
+  }
+  await assert.rejects(checkModelAccess({ apiKey: KEY, model: "../x", fetchImpl: f }))
 })
 
 test("API 키는 로그(console)에 남지 않는다", () => {
