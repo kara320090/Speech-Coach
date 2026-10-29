@@ -42,6 +42,7 @@ AI로 만든 대본의 낯선 표현을 풀어 보고, 자기 설명과 예상 �
 | PDF·DOCX·TXT 추출 API | `POST /api/scripts/import`, 화면 연결은 후속. [API 안내](docs/script-import-api.md) |
 | 검토 시점↔대본 문장 연결 API | `POST /api/scripts/align`, 외부 AI 없이 전사 앞뒤 구간으로 후보 문장 반환(matched/ambiguous/unmatched). 화면 연결은 후속. [API 안내](docs/script-align-api.md) |
 | 구간 기반 AI 코칭 API | `POST /api/coach/segment`, 사용자가 확인한 대본 위치와 검토 구간으로 상황 질문 → 개념 풀이·확인 질문·답변 검토·연습 행동. 모델 단계는 기존 `/api/coach`(자체 모델) 재사용. 화면 연결은 후속. [API 안내](docs/segment-coach-api.md) |
+| 구간 대화 기반 대본 문단 수정 API | `POST /api/scripts/revise-segment`, 구간 코칭 대화를 반영해 대상 문단만 고친 수정안(제안) 반환. 기존 rewrite·보존 검사 재사용, 서버는 대본을 바꾸지 않음. 화면 연결은 후속. [API 안내](docs/contextual-revision-api.md) |
 | 영상 눈 깜빡임 | MediaPipe를 브라우저에서만 실행. F21, 실제 얼굴 정확도 미검증 |
 | 후속 기획 | 개인 실측 시간에 맞춘 자동 수정, 세부 명제 의미 검사, 코칭·녹음의 완전한 연결, 상황 질문·환경 변경 자동 적용 등. [기능별 구현 범위](docs/local-ai-implementation.md) |
 
@@ -78,7 +79,7 @@ npm start
 
 ## 검사와 배포 범위
 
-`node --test --test-concurrency=1`: **192개 통과**. 제출 흐름은 S1–S7·S9 **8개**이며, 메인 전사·기존 녹화·파일·대본 코칭 별도 미디어 검사도 **35항목 확인**했다. 생성 서비스와 코칭의 독립성은 가짜 응답·실제 서명된 에이전트 전송으로 검사했다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다. [진행 기록](progress.md).
+`node --test --test-concurrency=1`: **209개 통과**. 제출 흐름은 S1–S7·S9 **8개**이며, 메인 전사·기존 녹화·파일·대본 코칭 별도 미디어 검사도 **35항목 확인**했다. 생성 서비스와 코칭의 독립성은 가짜 응답·실제 서명된 에이전트 전송으로 검사했다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다. [진행 기록](progress.md).
 
 `docker compose up --build`는 자체 CPU 모델과 웹을 함께 제공하며, 공개 Render는 서명된 운영 PC 에이전트로 코칭·전사를 처리한다. PC의 `npm run start:agent`와 모델이 실행 중이어야 자체 AI를 사용할 수 있다. 새 대본 생성은 서버 환경의 Gemini 키를 별도로 사용하며, 생성 서비스가 준비되지 않아도 기존 대본으로 연습할 수 있다. 검사는 [진행 기록](progress.md)에서 현재 확인 범위를 구분한다.
 
