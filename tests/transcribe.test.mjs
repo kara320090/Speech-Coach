@@ -44,6 +44,35 @@ async function withApp(env, fn) {
 
 const post = (base, body) => fetch(`${base}/api/transcribe`, { method: "POST", headers: { "Content-Type": "audio/wav" }, body })
 
+test("gateway segment normalization rejects missing times and keeps documented/alias shapes", async () => {
+  await withFakeGateway(() => [200, { text: "음 어", segments: [
+    { text: "bad", startSecond: null, endSecond: 1 },
+    { text: "bad", startSecond: "", endSecond: 1 },
+    { text: "bad", startSecond: -1, endSecond: 1 },
+    { text: "어", start: "1", end: "2" },
+    { text: "음", startSecond: 0, endSecond: 1 },
+  ] }], async (gw) => {
+    await withApp({ AI_GATEWAY_API_KEY: "test-only", AI_GATEWAY_URL: gw }, async (base) => {
+      const body = await (await post(base, wavOf(2))).json()
+      assert.deepEqual(body.segments, [{ text: "음", startSecond: 0, endSecond: 1 }, { text: "어", startSecond: 1, endSecond: 2 }])
+    })
+  })
+})
+
+test("invalid gateway JSON refunds reserved budget without exposing upstream content", async () => {
+  let calls = 0
+  const app = createServer({ env: { AI_GATEWAY_API_KEY: "test-only", TRANSCRIBE_TOTAL_SECONDS: "1" }, fetchImpl: async () => {
+    calls++
+    return calls === 1 ? { ok: true, json: async () => { throw new Error("upstream private detail") } } : { ok: true, json: async () => ({ text: "음" }) }
+  } })
+  const base = await listen(app)
+  try {
+    const first = await post(base, wavOf(1))
+    assert.equal(first.status, 502); assert.ok(!(await first.text()).includes("private"))
+    assert.equal((await post(base, wavOf(1))).status, 200)
+  } finally { await close(app) }
+})
+
 test("키가 없으면 503 not-configured이고 다른 주소는 그대로 동작한다", async () => {
   await withApp({}, async (base) => {
     const res = await post(base, wavOf(1))

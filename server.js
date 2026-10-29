@@ -10,6 +10,8 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "public")
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".wasm": "application/wasm",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
@@ -21,8 +23,9 @@ const HEADERS = {
   "Referrer-Policy": "no-referrer",
   // 마이크·카메라는 이 사이트에서만 쓴다.
   "Permissions-Policy": "microphone=(self), camera=(self)",
+  // 고정한 같은 출처 MediaPipe WASM 컴파일만 허용. JS unsafe-eval/외부 CDN/외부 전송은 열지 않는다.
   "Content-Security-Policy":
-    "default-src 'self'; media-src 'self' blob:; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; media-src 'self' blob:; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
 }
 
 const NOT_FOUND_HTML = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>페이지를 찾을 수 없어요</title></head><body><main><h1>페이지를 찾을 수 없어요</h1><p><a href="/">발표 연습 코치 첫 화면으로 가기</a></p></main></body></html>`
@@ -55,11 +58,12 @@ function cleanSegments(raw) {
   const out = []
   for (const s of raw) {
     const text = typeof s?.text === "string" ? s.text.trim() : ""
-    const startSecond = Number(s?.startSecond ?? s?.start)
-    const endSecond = Number(s?.endSecond ?? s?.end)
-    if (text && Number.isFinite(startSecond) && Number.isFinite(endSecond) && endSecond >= startSecond) out.push({ text, startSecond, endSecond })
+    const number = (v) => (typeof v === "number" || (typeof v === "string" && v.trim())) ? Number(v) : NaN
+    const startSecond = number(s?.startSecond ?? s?.start)
+    const endSecond = number(s?.endSecond ?? s?.end)
+    if (text && Number.isFinite(startSecond) && Number.isFinite(endSecond) && startSecond >= 0 && endSecond >= startSecond) out.push({ text, startSecond, endSecond })
   }
-  return out
+  return out.sort((a, b) => a.startSecond - b.startSecond)
 }
 
 export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch } = {}) {
@@ -104,6 +108,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
     try {
       data = await upstream.json()
     } catch {
+      transcribedSeconds -= seconds
       return sendJson(res, 502, { error: "gateway-error", message: "음성 인식 서비스의 응답을 읽지 못했어요." })
     }
     sendJson(res, 200, {

@@ -18,7 +18,8 @@
 | F12 | B3 | FR-12 | AC-12 | UI-08 | S8 | T12 | R3 / 계획·미구현 |
 | F13 | B6 | FR-13 | AC-13 | UI-09 | S9 | T13 | R1 / 계획·미구현 |
 | F14 | B6 | FR-14 | AC-14 | UI-10·07 | S10 | T14 | R2 / 계획·미구현 |
-| (번호 미배정) 영상 불러오기·선택 글자 변환 | B1 | — | — | `/import.html` → UI-03 | (scenarios.yaml 미포함) | 단위·`e2e/media/import.spec.ts` | 코드 존재 / 실제 AI Gateway·배포 미검증, 번호 결정 대기 |
+| F15 | B1 | FR-15 | AC-15 | `/import.html`·UI-03 | 별도 미디어 흐름 | T15 | 구현 / 실제 얼굴 정확도 미검증 |
+| F16 | B1 | FR-16 | AC-16 | `/import.html`·UI-03 | 별도 미디어 흐름 | T16 | 구현 / 실제 Gateway 미검증 |
 
 코칭 흐름 세부 연결: 화면 상태는 [화면 명세 2.1](screen-spec.md), 검증 사례 C1–C14는 [검증 계획 4.1](validation-plan.md)에서 T11–T14에 연결된다. 기록 구분(observation·userReport·hypothesis·trialOutcome)과 저장·전송 규칙은 [요구사항 분석 4.6–4.7](requirements-analysis.md).
 
@@ -36,3 +37,5 @@
 | [검증 계획](validation-plan.md) | T01–T14·사용자 검증·실행 증거·미검증 |
 | [결정 기록](decisions.md) | 사용자 지시·근거 상태·기존 기록 보존·미확인 |
 | [진행 기록](../progress.md) / [README](../README.md) | 현재 구현·실행 방법·검사·남은 일 |
+
+F15–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measurements.md), T15–T16은 [검증 계획](validation-plan.md)에 연결한다. 주최 측 YAML·e2e/scenarios에는 새 흐름을 추가하지 않는다.

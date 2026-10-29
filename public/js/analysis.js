@@ -1,6 +1,7 @@
 // 연습 결과 분석. 모든 판정은 아래 상수와 계산식을 화면에도 그대로 보여 준다.
 // 속도 단위: 분당 음절(한글 음절 글자 수 ÷ 시간(분)). 쉼도 시간에 포함한다.
 import { formatClock, formatKorean, formatSigned } from "./time.js"
+import { analyzeFillers } from "./fillers.js"
 
 export const SILENCE_MIN_SEC = 3 // 이 시간 이상 소리가 기준 이하면 '긴 침묵'
 export const SPEED_WINDOW_SEC = 10 // 속도를 재는 구간 길이
@@ -114,10 +115,11 @@ export function liveRate(segments, nowSec, windowSec = LIVE_SPEED_WINDOW_SEC) {
 }
 
 export function analyzeTranscript(segments, durationSec) {
+  const fillers = analyzeFillers(segments, durationSec)
   const withText = segments.filter((s) => countSyllables(s.text) > 0 || tokenize(s.text).length > 0)
   const totalSyllables = withText.reduce((a, s) => a + countSyllables(s.text), 0)
   if (!withText.length || totalSyllables === 0 || durationSec <= 0) {
-    return { status: "no-text", items: [], windows: [] }
+    return { status: "no-text", items: [], windows: [], fillers }
   }
   const overallRate = totalSyllables / (durationSec / 60)
 
@@ -226,12 +228,12 @@ export function analyzeTranscript(segments, durationSec) {
       } else i++
     }
   }
-  return { status: "ok", totalSyllables, overallRate, meanWindowRate, windows, items }
+  return { status: "ok", totalSyllables, overallRate, meanWindowRate, windows, items, fillers }
 }
 
 /* ───────── 검토할 구간 모으기 ───────── */
 
-export function buildReviewItems({ silence, transcript, sectionRows = [], toleranceSec = 0 }) {
+export function buildReviewItems({ silence, transcript, blink, sectionRows = [], toleranceSec = 0 }) {
   const items = []
   if (silence?.status === "ok") {
     for (const s of silence.segments) {
@@ -246,6 +248,8 @@ export function buildReviewItems({ silence, transcript, sectionRows = [], tolera
     }
   }
   if (transcript?.status === "ok") items.push(...transcript.items)
+  if (transcript?.fillers?.status === "ok") items.push(...transcript.fillers.items)
+  if (blink?.status === "ok") items.push(...blink.items)
   const tol = Math.max(0, Math.round(toleranceSec))
   for (const r of sectionRows) {
     if (r.actualSec === null || r.startSec === null) continue

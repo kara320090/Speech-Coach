@@ -25,7 +25,7 @@
   wav.js       음성 샘플 변환·WAV 생성
   analysis.js  규칙 기반 침묵·반복·속도 변화·회차 비교
   storage.js   IndexedDB 저장, 실패 시 현재 실행 메모리 보관
-  import-page.js / importer.js  (번호 미배정) 파일 소리 추출·조각 나누기·선택 글자 변환 요청
+  import-page.js / importer.js  (F16) 파일 소리 추출·조각 나누기·선택 글자 변환 요청
        │
        └─ Node 서버: public 파일, GET /__health, POST /api/transcribe(선택 시 AI Gateway 음성 인식 중계)
 ```
@@ -152,7 +152,7 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 | --- | --- | --- |
 | `GET /`, `/js/*`, `/styles.css` | 구현 | 정적 웹 화면·리소스 |
 | `GET /__health` | 구현 | status, releaseId. 실제 배포 SHA 주입 여부는 배포 시 별도 검증 |
-| `POST /api/transcribe` | 구현(번호 미배정) | 사용자가 글자 변환을 켠 영상 불러오기에서 WAV 조각을 AI Gateway로 중계. 503/415/413/429/502 구분. 실제 게이트웨이 호출 미검증, 상세는 [import-feature.md](import-feature.md) |
+| `POST /api/transcribe` | 구현(F16) | 사용자가 글자 변환을 켠 영상 불러오기에서 WAV 조각을 AI Gateway로 중계. 503/415/413/429/502 구분. 실제 게이트웨이 호출 미검증, 상세는 [import-feature.md](import-feature.md) |
 | `POST /api/revisions` | 계획 | 대본·필수 항목·시간 조건·실측 요약으로 제안 생성. baseVersionId와 requestId 반환 |
 | `POST /api/content-checks` | 계획 | 제공 근거와 수정문/발화의 일치 검사. 항목 ID별 상태·근거 반환 |
 
@@ -199,3 +199,9 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 | 운영 검증 | 단위 40개(`9d2a10b`) 및 기존 Docker·health·S1–S4 CI 4개 성공 확인 | 실제 장치·미디어 별도 검사·신규 기능·공개 배포 검증 |
 
 개발 우선순위는 [기획서](product-plan.md), 완료 판정은 [검증 계획](validation-plan.md), 연결표는 [추적표](traceability.md)를 따른다.
+
+## 추가 구현 F15·F16
+
+`video-analysis.js`는 고정 로컬 MediaPipe를 로드하고 영상 프레임을 순서대로 읽는다. `blinks.js`는 DOM과 분리된 계산, `fillers.js`는 전사 토큰 후보 계산, `measurement-ui.js`는 기존 결과에 두 측정 카드를 추가한다. app.js는 카드 연결만 추가한다. 영상·원시 얼굴 좌표를 서버로 보내지 않는다.
+
+`session.analysis.blink`에 기준 버전·집계·관측률·구간·검토 항목을, `session.analysis.transcript.fillers`에 후보 종류·횟수·위치를 저장한다. 원시 프레임·랜드마크는 보관하지 않는다. 기존 저장 세션에 필드가 없으면 미측정으로 표시하고 영상을 재분석할 수 있다. 세부 규칙·상태·예외는 [측정 명세](media-measurements.md)를 따른다.

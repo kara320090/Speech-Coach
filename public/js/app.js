@@ -7,6 +7,7 @@ import {
 } from "./analysis.js"
 import { MediaCapture, SpeechCapture } from "./recorder.js"
 import { deleteSession, getSession, listSessions, saveSession } from "./storage.js"
+import { measurementCards } from "./measurement-ui.js"
 
 const app = document.getElementById("app")
 const state = { practice: null, prefill: null, starting: false }
@@ -587,6 +588,7 @@ async function renderResult(session) {
     summary,
     sectionCard,
     review,
+    ...measurementCards(session, { h, seek, onUpdated: renderResult }),
     transcriptCard,
     compareHost,
     h(

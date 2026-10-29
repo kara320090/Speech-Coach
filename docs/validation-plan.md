@@ -98,3 +98,12 @@
 - 대본 수정 AI API 구현 후 비밀값 노출·전송 선택·입력 크기·요청 제한·지연·취소·오래된 응답·재시도 비용.
 
 기존 commit의 Docker·health·S1–S4 CI 성공은 확인했다. 문서 변경 commit의 CI는 push 후 별도로 확인한다. 공개 배포·실제 장치·별도 미디어 검증과 혼동하지 않는다.
+
+## 추가 구현 검증 T15–T16
+
+| ID | 입력·실패 조건 | 확인 항목 | 검사 |
+| --- | --- | --- | --- |
+| T15 / AC-15 | 합성 눈 계수, 한쪽 감음·긴 감음·얼굴 없음·모델 실패·취소·기준 부족 | 횟수·관측 분모·누락률·증가 근거·영상 이동·저장·기존 결과 유지 | tests/blinks.test.mjs, tests/vision-assets.test.mjs, e2e/media/measurements.spec.ts |
+| T16 / AC-16 | 전사 독립 토큰·사전 부분 문자열·전사 없음·키 없음·한도·JSON/구간 오류 | 후보 종류·횟수·근거 위치·선택 전송·누적 초 반환·나머지 기능 유지 | tests/fillers.test.mjs, tests/importer.test.mjs, tests/transcribe.test.mjs, e2e/media/import.spec.ts, e2e/media/measurements.spec.ts |
+
+실제 모델 로딩·빈 영상 미검출 검사와 가짜 blendshape로 계산·화면 흐름을 검사하는 것은 실제 사람 얼굴·카메라 정확도 검증과 다르다. 실제 Gateway 키는 개발 환경에 없어 실제 응답 모양을 확인하지 못했다. 실행 결과는 progress.md에 구분해 기록한다.
