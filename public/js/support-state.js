@@ -21,7 +21,7 @@ export function supportWorkspace(previous, original, revised, sources, metadata)
   baseline.versions.at(-1).origin = "support-original"
   delete baseline.versions.at(-1).model
   const next = workspaceWithGeneratedDraft(baseline, { script: revised, sources, model: metadata.model, requestId: metadata.requestId }, metadata.versionId, metadata.createdAt)
-  next.versions.at(-1).origin = "gemini-support-rewrite"
+  next.versions.at(-1).origin = metadata.origin || "gemini-support-rewrite" // 자체 AI 문단 수정은 "self-hosted-segment-revision"
   next.versions.at(-1).practiceId = metadata.practiceId || null
   return next
 }
