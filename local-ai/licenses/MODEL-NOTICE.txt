@@ -1,0 +1,15 @@
+Speech-Coach model distribution
+
+Qwen3-4B-Q4_K_M.gguf
+Source: Qwen/Qwen3-4B-GGUF, revision bc640142c66e1fdd12af0bd68f40445458f3869b.
+Copyright 2024 Alibaba Cloud. Apache License 2.0, see Qwen3-Apache-2.0.txt.
+The published Qwen GGUF bytes are unchanged. File splitting is for transport only.
+
+faster-whisper-base
+Source: Systran/faster-whisper-base, revision ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66.
+Converted from OpenAI Whisper base by SYSTRAN for CTranslate2.
+Copyright (c) 2022 OpenAI. MIT License, see Whisper-MIT.txt.
+The published model/config/tokenizer bytes are unchanged.
+
+These are public pretrained weights executed by Speech-Coach, not weights trained or fine-tuned by this team.
+llama.cpp and faster-whisper are separately attributed in the runtime documentation.

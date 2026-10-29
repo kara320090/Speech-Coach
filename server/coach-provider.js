@@ -1,5 +1,5 @@
 // Coaching always uses the self-hosted model, even with a legacy AI_PROVIDER=gemini setting.
-// Only the separate /api/scripts/generate service can call Google.
+// Only separate, explicitly opted-in script generation/support services can call Google.
 import { createLocalCoach } from "./local-coach.js"
 import { createGeminiClient, DEFAULT_GEMINI_MODEL } from "./gemini-client.js"
 import { createRemoteCoach, remoteLimits } from "./remote-coach.js"

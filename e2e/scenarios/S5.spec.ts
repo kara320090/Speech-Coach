@@ -1,0 +1,30 @@
+import { expect, test } from "@playwright/test"
+import { openMain } from "../fixtures/flow"
+
+const SCRIPT = "캐시는 이전 결과를 잠시 저장했다가 같은 요청이 오면 다시 사용하는 공간입니다."
+test("S5 학생이 자체 AI의 쉬운 대본을 확인 후 새 버전으로 적용하고 원문을 복원한다", async ({ page }) => {
+  await openMain(page)
+  await page.getByRole("link", { name: "대본 이해 연습", exact: true }).click()
+  await page.getByLabel("분석할 대본 구간").fill(SCRIPT)
+  await page.getByLabel("근거 자료 (선택)").fill(SCRIPT)
+  await page.getByRole("button", { name: "자료 저장", exact: true }).click()
+  const rewrite = page.getByRole("button", { name: "쉬운 대본 제안", exact: true })
+  await expect(rewrite).toBeEnabled({ timeout: 30000 })
+  await rewrite.click()
+  const draft = page.getByLabel("수정 제안 · 직접 고칠 수 있어요")
+  await expect(draft).toBeVisible({ timeout: 90000 })
+  const revised = await draft.inputValue()
+  expect(revised.length).toBeGreaterThan(3)
+  expect(revised).not.toBe(SCRIPT)
+  const apply = page.getByRole("button", { name: "새 버전으로 적용", exact: true })
+  await expect(apply).toBeDisabled()
+  await page.getByLabel("수치·조건·부정·한계와 핵심 의미를 확인했어요").check()
+  await expect(apply).toBeEnabled()
+  await apply.click()
+  await expect(page.locator("#revision")).toContainText("새 대본 버전으로 저장했어요")
+  await expect(page.getByLabel("분석할 대본 구간")).toHaveValue(revised)
+  await page.getByRole("button", { name: "처음 대본으로 되돌리기", exact: true }).click()
+  await expect(page.getByLabel("분석할 대본 구간")).toHaveValue(SCRIPT)
+  await page.reload()
+  await expect(page.getByLabel("분석할 대본 구간")).toHaveValue(SCRIPT)
+})

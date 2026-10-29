@@ -1,4 +1,4 @@
-// Node 22: coaching/transcription use self-hosted models; only new script generation uses Gemini.
+// Node 22: base coaching/STT use local models; opted-in script generation/support dialogue use Gemini.
 import http from "node:http"
 import fs from "node:fs/promises"
 import { readFileSync } from "node:fs"
@@ -7,6 +7,8 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createScriptImportHandler } from "./server/script-import.js"
 import { createScriptAlignHandler } from "./server/script-align.js"
 import { createSegmentCoach, SEGMENT_LIMITS } from "./server/segment-coach.js"
+import { createSupportCoach } from "./server/support-coach.js"
+import { createContextualRevision, REVISION_LIMITS } from "./server/contextual-revision.js"
 
 import { CoachError, LIMITS } from "./server/local-coach.js"
 import { createCoach, createScriptGenerator } from "./server/coach-provider.js"
@@ -59,14 +61,16 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks)
 }
 
-export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits, runtime, agentPublicKey } = {}) {
+export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits, runtime, agentPublicKey, healthReady = () => true } = {}) {
   const agentMode = env.AI_EXECUTION_MODE === "agent" || env.RENDER === "true"
   const broker = agentMode ? createAgentBroker(agentPublicKey || JSON.parse(readFileSync(new URL("./server/agent-public-key.json", import.meta.url), "utf8")).publicKey) : null
   const inferenceEnv = broker ? { ...env, AI_PROVIDER: "local", LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
   const inferenceFetch = broker ? broker.fetch : fetchImpl
   const coach = createCoach({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const segmentCoach = createSegmentCoach({ coach })
+  const segmentRevision = createContextualRevision({ coach })
   const generator = createScriptGenerator({ env, fetchImpl })
+  const supportCoach = createSupportCoach({ env, fetchImpl })
   const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const frontendOrigins = new Set(["https://speech-coach-public.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
   const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
@@ -86,6 +90,10 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         if (req.method !== "GET") return sendJson(res, 405, { error: "method" })
         return sendJson(res, 200, await generator.status())
       }
+      if (pathname === "/api/coach/support-status") {
+        if (req.method !== "GET") return sendJson(res, 405, { error: "method" })
+        return sendJson(res, 200, await supportCoach.status())
+      }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" })
       if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host && !frontendOrigins.has(req.headers.origin)) return sendJson(res, 403, { error: "origin", message: "이 페이지에서 시작한 요청만 처리할 수 있어요." })
       if (pathname === "/api/transcribe") {
@@ -95,11 +103,11 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         return
       }
       if (!(req.headers["content-type"] || "").startsWith("application/json")) return sendJson(res, 415, { error: "content-type", message: "JSON 형식으로 보내 주세요." })
-      const body = await readBody(req, pathname === "/api/coach/segment" ? SEGMENT_LIMITS.body : LIMITS.body)
+      const body = await readBody(req, pathname === "/api/coach/segment" ? SEGMENT_LIMITS.body : pathname === "/api/coach/support" ? 64 * 1024 : pathname === "/api/scripts/revise-segment" ? REVISION_LIMITS.body : LIMITS.body)
       if (!body) return sendJson(res, 413, { error: "too-large", message: "입력이 너무 커요. 짧은 구간으로 나누어 주세요." })
       let data
       try { data = JSON.parse(body.toString("utf8")) } catch { return sendJson(res, 400, { error: "invalid-json", message: "요청을 읽지 못했어요." }) }
-      const service = pathname === "/api/scripts/generate" ? generator : pathname === "/api/coach/segment" ? segmentCoach : coach
+      const service = pathname === "/api/scripts/generate" ? generator : pathname === "/api/coach/support" ? supportCoach : pathname === "/api/coach/segment" ? segmentCoach : pathname === "/api/scripts/revise-segment" ? segmentRevision : coach
       const result = await service.run(data, controller.signal, { client: clientId(req) })
       if (!res.destroyed) sendJson(res, 200, result)
     } catch (e) {
@@ -115,7 +123,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         if (!broker) return sendJson(res, 404, { error: "not-found" })
         return await broker.handle(req, res, url.pathname)
       }
-      if (["/api/transcribe", "/api/coach", "/api/coach/segment", "/api/model-status", "/api/scripts/generate", "/api/scripts/generation-status"].includes(url.pathname)) return await api(req, res, url.pathname)
+      if (["/api/transcribe", "/api/coach", "/api/coach/segment", "/api/coach/support", "/api/coach/support-status", "/api/scripts/revise-segment", "/api/model-status", "/api/scripts/generate", "/api/scripts/generation-status"].includes(url.pathname)) return await api(req, res, url.pathname)
       if (url.pathname === "/api/scripts/align") {
         if (req.method !== "POST") {
           res.writeHead(405, { Allow: "POST", ...HEADERS })
@@ -135,8 +143,10 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         return res.end()
       }
       if (url.pathname === "/__health") {
-        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...HEADERS })
-        return res.end(JSON.stringify({ status: "ok", releaseId }))
+        // 자체 AI를 함께 띄우는 컨테이너에서는 모델이 준비되거나 실패가 확정될 때까지 503(starting)으로 답한다(start.mjs의 healthReady).
+        const ready = healthReady() !== false
+        res.writeHead(ready ? 200 : 503, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...HEADERS })
+        return res.end(JSON.stringify({ status: ready ? "ok" : "starting", releaseId }))
       }
       let rel = decodeURIComponent(url.pathname)
       if (rel.endsWith("/")) rel += "index.html"

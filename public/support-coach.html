@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>함께 살펴보는 발표 · 다시봄</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/coach.css"><link rel="stylesheet" href="/support.css"></head>
+<body>
+  <header class="top"><a class="brand" href="/">다시봄</a><nav aria-label="주 메뉴"><a href="/">발표 연습</a><a href="/coach.html">자체 AI 이해 연습</a></nav></header>
+  <main class="coach-wrap">
+    <p class="eyebrow">내 상황에 맞는 다음 한 걸음</p><h1>잠깐 멈춘 곳, 함께 풀어볼까요?</h1>
+    <p>표현이 낯설었는지, 다음 문장이 생각나지 않았는지, 잠시 쉬고 싶었는지는 본인이 가장 잘 알아요. AI가 먼저 묻고 답에 맞춰 함께 정리해요.</p>
+    <p id="support-model" role="status">대화 코칭 연결을 확인하고 있어요.</p><button id="refresh-support" type="button">연결 다시 확인</button>
+    <section class="coach-panel" aria-labelledby="support-prepare-title">
+      <h2 id="support-prepare-title">1. 함께 볼 대본과 관찰</h2><p id="record-context"></p>
+      <label id="chunk-label" hidden>대본에서 함께 볼 부분<select id="script-chunk"></select></label>
+      <label>함께 볼 대본<textarea id="support-script" rows="7" maxlength="2400"></textarea></label>
+      <label>내용 확인에 사용할 근거 자료 (선택)<textarea id="support-sources" rows="4" maxlength="2400"></textarea></label>
+      <h3>연습에서 표시된 관찰 후보</h3><ul id="support-observations"></ul><p>관찰은 원인을 뜻하지 않아요. 대본 위치와 맞는지 직접 확인하고, 해당하지 않는 관찰은 선택 해제할 수 있어요.</p>
+      <label>함께 정리하고 싶은 상황 (선택)<textarea id="support-context" rows="2" maxlength="600" placeholder="예: AI가 만든 대본의 용어를 제 말로 설명하고 싶어요."></textarea></label>
+      <label><input id="share-support" type="checkbox"> 선택한 대본·근거·관찰 텍스트와 이 대화의 답변을 Google Gemini로 보내는 데 동의해요</label>
+      <p id="support-notice">이 기능은 Gemini 3.8 Flash를 사용해요. 녹음·영상·얼굴은 전송하지 않아요. 기존 녹화 분석·전사와 자체 AI 이해 연습은 별도로 유지돼요.</p>
+      <div class="coach-actions"><button id="start-support" type="button" disabled>동의하고 함께 살펴보기</button><button id="cancel-support" type="button" hidden>응답 기다리기 취소</button></div>
+      <p id="support-state" role="status" aria-live="polite"></p>
+    </section>
+    <section class="coach-panel" id="support-dialogue" aria-labelledby="support-dialogue-title" hidden>
+      <h2 id="support-dialogue-title">2. 무엇이 도움이 될까요?</h2><div id="support-messages" role="log" aria-live="polite"></div>
+      <label>내 상황·답변<textarea id="support-answer" rows="3" maxlength="1000" placeholder="기억나는 만큼만 말해 주세요. 잘 모르겠다고 해도 괜찮아요."></textarea></label>
+      <div id="support-hints" class="coach-actions"></div>
+      <div class="coach-actions"><button id="answer-support" type="button">답변 보내기</button><button id="skip-support" type="button">여기까지 정리하기</button></div>
+      <p id="support-count"></p>
+      <div id="rewrite-permission" hidden><h3>대본을 더 편하게 말해볼까요?</h3><p>원하시면 낯선 표현을 쉬운 단어로 풀고 문장을 짧게 나눈 초안을 만들 수 있어요. 원문은 보존해요.</p><div class="coach-actions"><button id="accept-rewrite" type="button">네, 쉬운 대본을 제안해 주세요</button><button id="decline-rewrite" type="button">지금 대본을 유지할게요</button></div></div>
+    </section>
+    <section class="coach-panel" id="support-revision" aria-labelledby="support-revision-title" hidden>
+      <h2 id="support-revision-title">3. 초안을 보고 직접 선택해요</h2><div class="coach-grid"><div><h3>원래 대본</h3><blockquote id="support-original"></blockquote></div><label>쉬운 대본 초안 · 직접 수정할 수 있어요<textarea id="support-proposal" rows="8" maxlength="2400"></textarea></label></div>
+      <p id="support-reason"></p><p id="support-checks" class="coach-warning"></p>
+      <label><input id="confirm-support-meaning" type="checkbox"> 수치·단위·조건·부정·한계와 핵심 의미를 확인했고 다음 연습 대본에 적용할게요</label>
+      <div class="coach-actions"><button id="apply-support" type="button" disabled>수정본으로 다음 연습 준비</button><button id="discard-support" type="button">초안은 사용하지 않을게요</button></div>
+      <p>선택한 부분만 바꾸고 나머지 대본은 유지해요. 지난 녹음·측정값·당시 대본은 바꾸지 않아요.</p>
+    </section>
+    <section class="coach-panel"><h2>내가 고른 방식으로 이어가기</h2><div class="coach-actions"><a href="/">발표 연습으로</a><a id="back-result" href="/">연습 결과로</a><a href="/coach.html">자체 AI로 개념·질문 연습</a><button id="undo-support" type="button" hidden>직전 적용 전 대본으로 되돌리기</button><button id="clear-support" type="button">이 탭의 대화 지우기</button></div><p>대화는 이 탭에 임시 보관해요. 원인을 확정하거나 발표 능력·감정을 평가하지 않아요.</p></section>
+  </main><script type="module" src="/js/support-page.js"></script>
+</body></html>

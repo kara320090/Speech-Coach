@@ -1,8 +1,25 @@
 # 요구사항 추적표
 
+## 현재 제출 8개 흐름
+
+실제 제출 계약은 `scenarios.yaml`과 다음 E2E다. 시간·대본·자체 AI·기록 보존을 화면에서 확인한다.
+
+| ID | 현재 사용자 흐름 | 기능 연결 | E2E |
+| --- | --- | --- | --- |
+| S1 | TXT 편집·저장·재조회, 목표보다 일찍 종료 | F1·F7 | S1.spec.ts |
+| S2 | 목표 시간 초과 | F2 | S2.spec.ts |
+| S3 | 구간 계획과 실제 시간 비교 | F3 | S3.spec.ts |
+| S4 | 같은 조건의 이전 회차 비교 | F6 | S4.spec.ts |
+| S5 | 자체 AI 쉬운 대본·의미 확인·버전 적용·원문 복원 | F7·F9·F10의 초기 범위 | S5.spec.ts |
+| S6 | 자체 AI 개념·자기 설명·근거 검토·확인 이력 | F17·F18·F20 | S6.spec.ts |
+| S7 | 자체 음성 전사·속도·군말·새로고침 보존 | F16·F20 | S7.spec.ts |
+| S9 | 관찰 확인·조건 선택·구간 재연습·전후 비교 | F11·F13·F14의 초기 범위 | S9.spec.ts |
+
+확장 목표는 아래 P05–P11로 구분한다. 초기 범위의 검증을 전체 확장 요구사항 완료로 표시하지 않는다.
+
 ## 2026-10-30 AI 처리 역할
 
-새 대본 생성(F22)은 `/create-script.html`·`POST /api/scripts/generate`에서 Gemini 3.8 Flash로 처리한다. 사용자가 입력한 주제·근거 자료만 전송하며, 초안 확인 후 기존 기록을 보존한 새 버전으로 저장한다. 기존 대본의 개념 분석·쉬운 표현 수정·질문·답변 검토는 Qwen, 음성 전사는 faster-whisper로 처리한다. 자체 AI와 Gemini의 상태·실패는 독립적이며 자동 공급자 대체는 없다. API·설정은 [역할 분리 명세](gemini-coach.md)를 따른다.
+새 대본 생성(F22)과 사용자가 별도로 동의해 선택한 상황 대화(F23)는 Gemini 3.8 Flash로 처리한다. F22는 주제·근거만, F23은 선택한 대본·근거·관찰 텍스트·현재 대화 답변만 전송한다. F23은 열린 질문으로 시작하고 쉬운 대본을 만들지 먼저 물으며 확인한 초안만 다음 연습에 적용한다. 기존 `/coach.html`의 개념·수정·질문·답변 검토와 구간 코칭 API는 Qwen, 음성 전사는 faster-whisper를 유지한다. 자동 공급자 대체는 없다. [AI 역할](gemini-coach.md)·[도움 대화 명세](supportive-coach.md)를 따른다.
 
 ## 2026-10-30 main 통합 상태
 
@@ -13,6 +30,8 @@ main의 다시봄 화면, TXT 불러오기, 구간 질문·조건 선택·재연
 
 기준일: 2026-10-29. 기획→문제→기능→화면→검증을 같은 ID로 연결한다. B4(웹)·B5(문서 정합성) 및 비기능 요구는 전 기능에 적용한다.
 
+아래 P05–P11은 전체 확장 기획의 목표 연결이다. 실제 제출 검사는 이 문서의 현재 제출 8개 흐름과 scenarios.yaml을 따른다.
+
 | 기능 | 사업 요구 | 요구사항 | 완료 조건 | 화면 | 시나리오 | 검증 | 단계·상태 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | F1 | B2 | FR-01 | AC-01 | UI-01 | S1 | T01 | R0 / 코드 존재·실사용 검증 필요 |
@@ -21,18 +40,18 @@ main의 다시봄 화면, TXT 불러오기, 구간 질문·조건 선택·재연
 | F4 | B1 | FR-04 | AC-04 | UI-02·UI-03 | 장치 검증 | T04 | R0 / 코드 존재·실사용 검증 필요 |
 | F5 | B1 | FR-05 | AC-05 | UI-03 | 구간 재생 검증 | T05 | R0 / 코드 존재·실사용 검증 필요 |
 | F6 | B3 | FR-06 | AC-06 | UI-03·UI-04 | S4 | T06 | R0 / 코드 존재·실사용 검증 필요 |
-| F7 | B3 | FR-07 | AC-07 | 대본 패널 ‘대본 편집’(TXT 불러오기), UI-05 | S5 | T07 | R1 / 대본 TXT·붙여넣기 입력·파일명 기록·재연습 연결 구현(`tests/script.test.mjs`, `e2e/media/script.spec.ts`), 필수 항목·버전·수정안 미구현 |
-| F8 | B2 | FR-08 | AC-08 | UI-05·UI-03 | S5 | T08 | R1 / 계획·미구현 |
-| F9 | B2·B3 | FR-09 | AC-09 | UI-06 | S6·S7 | T09 | R3 / 계획·미구현 |
-| F10 | B3 | FR-10 | AC-10 | UI-06 | S6·S7 | T10 | R3 / 계획·미구현 |
-| F11 | B1·B3·B6 | FR-11 | AC-11 | UI-07·10 | S8·S10 | T11 | R2 / 계획·미구현 |
-| F12 | B3 | FR-12 | AC-12 | UI-08 | S8 | T12 | R3 / 계획·미구현 |
-| F13 | B6 | FR-13 | AC-13 | UI-09 | S9 | T13 | R1 / 계획·미구현 |
-| F14 | B6 | FR-14 | AC-14 | UI-10·07 | S10 | T14 | R2 / 계획·미구현 |
-| F15 | B7 | FR-15 | AC-15 | UI-11·06·07 | S11 | T15 | R1(이해 확인)·R3(다듬기·교차검증) / 계획·미구현 |
+| F7 | B3 | FR-07 | AC-07 | 대본 패널 ‘대본 편집’(TXT 불러오기), UI-05 | P05 | T07 | R1 / 대본 TXT·붙여넣기 입력·파일명 기록·재연습 연결 구현(`tests/script.test.mjs`, `e2e/media/script.spec.ts`), 필수 항목·버전·수정안 미구현 |
+| F8 | B2 | FR-08 | AC-08 | UI-05·UI-03 | P05 | T08 | R1 / 계획·미구현 |
+| F9 | B2·B3 | FR-09 | AC-09 | UI-06 | P06·P07 | T09 | R3 / 계획·미구현 |
+| F10 | B3 | FR-10 | AC-10 | UI-06 | P06·P07 | T10 | R3 / 계획·미구현 |
+| F11 | B1·B3·B6 | FR-11 | AC-11 | UI-07·10 | P08·P10 | T11 | R2 / 계획·미구현 |
+| F12 | B3 | FR-12 | AC-12 | UI-08 | P08 | T12 | R3 / 계획·미구현 |
+| F13 | B6 | FR-13 | AC-13 | UI-09 | P09 | T13 | R1 / 계획·미구현 |
+| F14 | B6 | FR-14 | AC-14 | UI-10·07 | P10 | T14 | R2 / 계획·미구현 |
+| F15 | B7 | FR-15 | AC-15 | UI-11·06·07 | P11 | T15 | R1(이해 확인)·R3(다듬기·교차검증) / 계획·미구현 |
 
 | F21 | B1 | FR-21 | AC-21 | `/import.html`·UI-03 | 별도 미디어 흐름 | T21 | 구현 / 실제 얼굴 정확도 미검증 |
-| F16 | B1 | FR-16 | AC-16 | `/import.html`·UI-03 | 별도 미디어 흐름 | T16 | 구현 / 실제 Gateway 미검증 |
+| F16 | B1 | FR-16 | AC-16 | `/import.html`·UI-03 | 별도 미디어 흐름 | T16 | 자체 전사 구현 / 사람 음성 정확도 검증 별도 |
 
 코칭 흐름 세부 연결: 화면 상태는 [화면 명세 2.1](screen-spec.md), 검증 사례 C1–C14는 [검증 계획 4.1](validation-plan.md)에서 T11–T14에 연결된다. 기록 구분(observation·userReport·hypothesis·trialOutcome)과 저장·전송 규칙은 [요구사항 분석 4.6–4.7](requirements-analysis.md).
 
@@ -46,12 +65,12 @@ main의 다시봄 화면, TXT 불러오기, 구간 질문·조건 선택·재연
 | [경쟁 분석](competitive-analysis.md) | 직접 확인·공식 설명·미확인·증거·차별화 결정 |
 | [요구사항 정의](requirements-definition.md) | B/FR/AC/NFR, 입력·출력·예외·수용 기준 |
 | [요구사항 분석](requirements-analysis.md) | 구조·데이터·API·판정 규칙·오류·구현 차이 |
-| [화면 명세](screen-spec.md) / [실제 흐름](scenarios.yaml) | 현재 화면·S1–S4와 계획 화면·S5–S11 |
+| [화면 명세](screen-spec.md) / [실제 흐름](scenarios.yaml) | 현재 제출 S1–S7·S9와 확장 계획 P05–P11 |
 | [검증 계획](validation-plan.md) | T01–T15·사용자 검증·실행 증거·미검증 |
 | [결정 기록](decisions.md) | 사용자 지시·근거 상태·기존 기록 보존·미확인 |
 | [진행 기록](../progress.md) / [README](../README.md) | 현재 구현·실행 방법·검사·남은 일 |
 
-F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measurements.md), T21–T16은 [검증 계획](validation-plan.md)에 연결한다. 주최 측 YAML·e2e/scenarios에는 새 흐름을 추가하지 않는다.
+F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measurements.md), T21–T16은 [검증 계획](validation-plan.md)에 연결한다. 자체 전사는 현재 제출 S7에 연결하고 얼굴 정확도·장치별 검사는 별도 미디어 검사로 구분한다.
 
 
 ## 새 문제·초기 구현 연결
@@ -63,7 +82,7 @@ F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measur
 | F17 | B7 | FR-17 / AC-17 | UI-COACH NC1 | T17 | 개념·풀이·인용 초기 구현 |
 | F18 | B7 | FR-18 / AC-18 | UI-COACH NC1·NC3 | T18 | 자기 설명·근거 대조 초기 구현, 품질 검증 필요 |
 | F19 | B7 | FR-19 / AC-19 | UI-COACH NC3 | T19 | 질문 1개씩·답변 검토 구현, 동등 문항 검증 후속 |
-| F20·F16 | B8 | FR-20 / AC-20 / NFR-11 | UI-COACH·UI-IMPORT | T20·T16 | 자체 LLM·전사 구현, 공개 운영·사람 음성 품질 미검증 |
+| F20·F16 | B8 | FR-20 / AC-20 / NFR-11 | UI-COACH·UI-IMPORT | T20·T16 | 자체 LLM·전사 구현, 공개 연결 검증 완료·사람 음성 품질 검증 별도 |
 
 위 표가 새 자체 AI 방향의 현재 상태이며 기존 R1–R3 행은 원래 목표 배치다. 현재 상세 갭은 [구현 범위](local-ai-implementation.md), 실행은 [local-ai/README](../local-ai/README.md). 주최 측 S1–S4와 YAML은 유지한다.
 
@@ -73,8 +92,16 @@ F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measur
 | --- | --- | --- | --- | --- |
 | F22 | FR-22 / AC-22 | UI-CREATE NC4 | script-generation.js·create-script-page.js·gemini-coach.test.mjs·coach-provider.spec.ts | 새 대본 생성·확인·원본 보존·자체 코칭 이동 |
 
-F17–F20·F16은 자체 모델로 처리하며, F22만 외부 Gemini를 사용한다. 주최 측 S1–S4·S9와 scenarios.yaml의 흐름은 유지한다.
+F17–F20·F16은 자체 모델로 처리하며, 새 대본 F22와 별도 동의한 도움 대화 F23은 Gemini를 사용한다. 주최 측 S1–S4·S9와 scenarios.yaml의 흐름은 유지한다.
 
 ## 메인 전사 연결 검증
 
 F16·FR-16·AC-16은 메인 분석과 파일 가져오기에서 동일한 자체 전사 API를 사용한다. `recording-analysis.js`·`tests/recording-analysis.test.mjs`가 짧은 녹음·선택 해제·서버 없음·부분 실패·취소를 검증한다. `e2e/media/main-transcription.spec.ts`는 메인 버튼→WAV 요청→군말·속도·재생 위치·재조회와 원본 보존을 검증한다. 주최 측 S1–S4·S9와 버튼 이름은 유지한다.
+
+## F23 추적 — 별도 선택 기능
+
+| 기능·수용 조건 | 화면 | 코드 | 검사 | 전송·적용 경계 |
+| --- | --- | --- | --- | --- |
+| F23 / FR-23 / AC-23 | 결과 → UI-SUPPORT | support-coach.js·support-page.js·support-state.js | tests/support-coach.test.mjs, e2e/media/support-coach.spec.ts | 동의한 텍스트만 Gemini, 허락 후 초안 생성·확인 후 다음 연습 적용 |
+
+제출 S1–S7·S9의 8개 흐름과 기존 장치·키 없는 완료 조건을 유지한다. F23의 브라우저 검사는 가짜 공급자 응답을 사용하고 실제 공개 Gemini 응답은 progress.md에 따로 구분한다.

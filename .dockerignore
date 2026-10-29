@@ -7,3 +7,9 @@ docs
 progress.md
 local-ai/runtime.local.json
 local-ai/*.pem
+models
+.model-download
+.test-artifacts
+.venv
+**/*.gguf
+**/*.part

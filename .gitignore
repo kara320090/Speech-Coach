@@ -40,6 +40,8 @@ e2e/fixtures/fake-speech.wav
 
 # Local inference assets and Python environments
 *.gguf
+*.gguf.part*
+.model-download/
 models/
 .venv/
 __pycache__/

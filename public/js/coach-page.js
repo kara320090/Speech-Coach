@@ -5,16 +5,22 @@ const $ = id => document.getElementById(id)
 const id = () => crypto.randomUUID()
 const DEFAULT_QUESTION = "이 대본에서 전달하려는 내용을 자기 말로 설명해 보세요."
 const fresh = () => ({ id: "current", versions: [], attempts: [], script: "", sources: "", versionId: id(), question: DEFAULT_QUESTION, concept: null, reference: "", helpUsed: false, followups: 0 })
-let state = fresh(), ready = false, controller = null, generation = 0, saveQueue = Promise.resolve()
+let state = fresh(), ready = false, controller = null, generation = 0, saveQueue = Promise.resolve(), reviewSaving = false
 function h(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e }
 function button(text, action) { const e = h("button", text); e.type = "button"; e.addEventListener("click", action); return e }
 function status(text) { $("request-state").textContent = text }
-function controls() { document.querySelectorAll("[data-ai]").forEach(e => { e.disabled = !ready || Boolean(controller) }); $("cancel").hidden = !controller }
+function controls() {
+  $("answer").disabled = Boolean(controller) || reviewSaving
+  document.querySelectorAll("[data-ai]").forEach(e => { e.disabled = !ready || Boolean(controller) || reviewSaving })
+  document.querySelectorAll("[data-review]").forEach(e => { e.disabled = Boolean(controller) || reviewSaving })
+  $("cancel").hidden = !controller
+}
 function persist() {
   const copy = structuredClone(state)
   saveQueue = saveQueue.catch(() => {}).then(async () => {
     const saved = await saveWorkspace(copy)
     $("save-state").textContent = saved ? "자료와 연습 기록을 이 브라우저에 저장했어요." : "저장하지 못해 현재 화면에만 보관 중이에요. 닫기 전에 기록을 내보내 주세요."
+    return saved
   })
   return saveQueue
 }
@@ -120,7 +126,19 @@ function renderFeedback(result, snapshot, metadata, selected) {
   const box = $("feedback"); box.replaceChildren(h("h3", { supported: "자료와 부합하는 설명", "needs-work": "다음으로 보완할 부분", uncertain: "아직 판단하기 어려운 부분" }[result.state]))
   if (result.supported) box.append(h("p", result.supported))
   box.append(h("p", result.nextStep), h("p", result.sourceQuote ? `비교한 자료: ${result.sourceQuote}` : "근거 자료가 없어 이해 여부를 판단하지 않았어요.", "coach-evidence"))
-  box.append(h("p", "모델의 검토 초안이에요. 답변과 근거가 맞는지 확인해 주세요."), button("이 검토가 맞아요", () => { attempt.result.humanReview = "confirmed"; persist(); renderHistory(); status("사용자가 확인한 검토로 기록했어요.") }), button("이 검토가 맞지 않아요", () => { attempt.result.humanReview = "disputed"; persist(); renderHistory(); status("검토에 동의하지 않음으로 기록했어요. 원문 근거로 다시 확인할 수 있어요.") }))
+  const reviewButton = (label, value) => {
+    const e = button(label, async () => {
+      reviewSaving = true; controls(); attempt.result.humanReview = value
+      try {
+        const saved = await persist()
+        renderHistory()
+        status(saved ? (value === "confirmed" ? "사용자가 확인한 검토로 기록했어요." : "검토에 동의하지 않음으로 기록했어요. 원문 근거로 다시 확인할 수 있어요.") : "확인 상태를 현재 화면에만 보관 중이에요. 닫기 전에 기록을 내보내 주세요.")
+      } finally { reviewSaving = false; controls() }
+    })
+    e.dataset.review = ""; e.disabled = Boolean(controller) || reviewSaving
+    return e
+  }
+  box.append(h("p", "모델의 검토 초안이에요. 답변과 근거가 맞는지 확인해 주세요."), reviewButton("이 검토가 맞아요", "confirmed"), reviewButton("이 검토가 맞지 않아요", "disputed"))
   $("attempt-state").textContent = `이번 질문 확인 ${state.followups}/3 · ${selected.helpUsed ? "풀이·근거를 본 뒤 답변" : "풀이·근거를 열지 않고 답변"}`
   // Any feedback is assistance for the next attempt unless the user starts a fresh unassisted retry.
   state.helpUsed = true; renderHistory()
@@ -167,7 +185,21 @@ $("export").onclick = () => {
 }
 $("restore").onclick = async () => {
   if (!state.versions.length) return
-  cancel(""); const original = state.versions[0]; $("script").value = original.script; $("sources").value = original.sources; syncDraft(); await persist(); $("revision").replaceChildren(); $("concept-list").replaceChildren(); renderHistory(); status("처음 저장한 자료를 새 버전으로 되돌렸어요. 이전 기록은 유지돼요.")
+  cancel("처음 대본을 새 버전으로 보관하고 있어요.")
+  const original = state.versions[0], versionId = id(), draftAnswer = $("answer").value
+  const restored = { ...structuredClone(state), script: original.script, sources: original.sources, versionId,
+    question: DEFAULT_QUESTION, concept: null, reference: "", helpUsed: false, followups: 0,
+    versions: [...state.versions, { id: versionId, script: original.script, sources: original.sources, createdAt: Date.now() }] }
+  $("restore").disabled = true; $("script").readOnly = true; $("sources").readOnly = true
+  try {
+    // Show the restored draft after its transaction completes, so an immediate reload keeps it.
+    saveQueue = saveQueue.catch(() => {}).then(() => saveWorkspace(restored))
+    const saved = await saveQueue
+    state = restored; $("script").value = original.script; $("sources").value = original.sources; resetPrompt()
+    $("answer").value = draftAnswer
+    $("revision").replaceChildren(); $("concept-list").replaceChildren(); renderHistory()
+    status(saved ? "처음 저장한 자료를 새 버전으로 되돌렸어요. 이전 기록은 유지돼요." : "원문을 현재 화면에만 보관 중이에요. 저장하지 못했으니 닫기 전에 내보내 주세요.")
+  } finally { $("restore").disabled = false; $("script").readOnly = false; $("sources").readOnly = false }
 }
 $("clear").onclick = async () => {
   if (!confirm("이 페이지에 저장한 대본·자료·답변 기록을 모두 삭제할까요? 기존 녹음 기록은 포함하지 않아요.")) return

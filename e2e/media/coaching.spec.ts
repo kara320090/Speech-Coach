@@ -21,6 +21,46 @@ async function prepare(page: Page) {
   await page.getByRole("button", { name: "자료 저장", exact: true }).click()
 }
 
+async function slowCommits(page: Page) {
+  await page.addInitScript(() => {
+    ;(window as any).__commitDelay = 0
+    const d = Object.getOwnPropertyDescriptor(IDBTransaction.prototype, "oncomplete")!
+    Object.defineProperty(IDBTransaction.prototype, "oncomplete", { ...d, set(listener) {
+      d.set!.call(this, typeof listener === "function" ? function (event: Event) { setTimeout(() => listener.call(this, event), (window as any).__commitDelay) } : listener)
+    } })
+  })
+}
+
+test("restored script is displayed only after its storage commit, including slow storage", async ({ page }) => {
+  await slowCommits(page)
+  await mock(page); await prepare(page)
+  await page.getByRole("button", { name: "쉬운 대본 제안", exact: true }).click()
+  await page.getByLabel("수치·조건·부정·한계와 핵심 의미를 확인했어요").check()
+  await page.getByRole("button", { name: "새 버전으로 적용", exact: true }).click()
+  await expect(page.locator("#revision")).toContainText("새 대본 버전으로 저장했어요")
+  const editor = page.getByLabel("분석할 대본 구간"), revised = await editor.inputValue()
+  await page.evaluate(() => { (window as any).__commitDelay = 350 })
+  await page.getByRole("button", { name: "처음 대본으로 되돌리기", exact: true }).click()
+  await expect(editor).toHaveValue(revised)
+  await expect(editor).toHaveValue(script)
+  await page.reload()
+  await expect(editor).toHaveValue(script)
+})
+
+test("human review confirmation is saved before displaying confirmed history", async ({ page }) => {
+  await slowCommits(page); await mock(page); await prepare(page)
+  await page.getByLabel("내 설명·답변").fill("같은 요청이 오면 저장한 결과를 다시 사용합니다.")
+  await page.getByRole("button", { name: "답변 함께 확인", exact: true }).click()
+  const confirm = page.getByRole("button", { name: "이 검토가 맞아요", exact: true })
+  await expect(confirm).toBeEnabled()
+  await page.evaluate(() => { (window as any).__commitDelay = 350 })
+  await confirm.click()
+  await expect(page.locator("#attempt-history")).toContainText("사용자 확인: 미확인")
+  await expect(page.locator("#attempt-history")).toContainText("사용자 확인: 맞음")
+  await page.reload()
+  await expect(page.locator("#attempt-history")).toContainText("사용자 확인: 맞음")
+})
+
 test("local coaching supports explanation, retry, before/after, persistence and explicit review", async ({ page }) => {
   await mock(page); await prepare(page)
   await page.getByRole("button", { name: "낯선 개념 살펴보기" }).click()

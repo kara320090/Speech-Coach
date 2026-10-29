@@ -126,6 +126,10 @@ export function createGeminiClient({ apiKey, model = DEFAULT_GEMINI_MODEL, timeo
   if (!/^[a-z0-9][a-z0-9.-]{0,80}$/i.test(model)) throw new Error("invalid-model-name")
   const url = `${baseUrl}/models/${model}:generateContent`
   const thinking = thinkingConfigFor(model)
+  // Gemini 3.6+ ignores sampling overrides and is deprecating them; use its defaults.
+  // https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.8
+  const version = model.match(/^gemini-(\d+)(?:\.(\d+))?/)
+  const defaultSampling = version && (Number(version[1]) > 3 || Number(version[1]) === 3 && Number(version[2]) >= 6)
   return {
     provider: "gemini",
     model,
@@ -140,7 +144,7 @@ export function createGeminiClient({ apiKey, model = DEFAULT_GEMINI_MODEL, timeo
             systemInstruction: { parts: [{ text: system }] },
             contents: [{ role: "user", parts: [{ text: user }] }],
             generationConfig: {
-              temperature,
+              ...(!defaultSampling && { temperature }),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
               responseMimeType: "application/json",
               responseJsonSchema: schema,
