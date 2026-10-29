@@ -240,7 +240,7 @@ IndexedDB `speech-coach` / store `sessions`(keyPath `id`)에 세션을 저장한
 | 검사 | 파일 | 범위 |
 | --- | --- | --- |
 | 단위 | `tests/coach.test.mjs`, `tests/analysis.test.mjs`, `tests/server.test.mjs` | 군말·시선·질문 규칙·범위·전후 수치·CSP·wasm MIME |
-| 시나리오(장치 없음) | `e2e/scenarios/S1–S4, S9` + `e2e/fixtures/flow.ts` | 주최 측 실행과 같은 조건 |
+| 시나리오(장치 없음) | `e2e/scenarios/S1–S7, S9` + `e2e/fixtures/flow.ts` | 주최 측 실행과 같은 조건 |
 | 장치(가짜 마이크·웹캠) | `e2e/media/*.spec.ts` (`media.config.ts`) | 침묵·속도·반복·시선 이탈·권한 거부·저장 실패·불러오기 |
 
 ## 9. 알려진 제한
