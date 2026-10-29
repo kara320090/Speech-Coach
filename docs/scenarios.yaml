@@ -1,5 +1,6 @@
 # 현재 구현 화면의 S1–S4 유지. 기존 625b942의 CI에서 4개 통과; 실제 장치 검증은 별도.
-# F7–F12 확장 시나리오 S5–S8은 미구현이므로 docs/screen-spec.md에 분리한다.
+# F7–F14 확장 시나리오 S5–S10은 미구현이므로 docs/screen-spec.md에 분리한다.
+# 번호 미배정 영상 불러오기(/import.html)는 구현됐지만 작성자 결정에 따라 여기에 넣지 않았다(docs/import-feature.md).
 platform: desktop
 platformReason: 사용자가 설치형 앱을 만들지 말라고 명시했다. 주 사용 환경은 노트북·PC 웹브라우저이며 마이크와 선택 웹캠으로 혼자 발표를 연습한다. desktop은 PC 화면을 뜻하고
   설치형 데스크톱 앱을 뜻하지 않는다. 모바일 네이티브 앱은 개발 범위에 포함하지 않는다.
