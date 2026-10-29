@@ -30,6 +30,7 @@ SUMTECH 2026 팀의 **설치 없이 사용하는 PC·노트북 웹 서비스**�
 | [원인 확인·연습 조건 설계](docs/coaching-design.md) | 관찰 확인·짧은 질문·선택 조치·재연습·가상 대화 |
 | [요구사항 정의서](docs/requirements-definition.md) | 기능·비기능 요구, 입력·출력·예외·완료 조건 |
 | [요구사항 분석서](docs/requirements-analysis.md) | 현재·계획 구조, 처리 규칙, 데이터, API, 의존성·구현 차이 |
+| [UI·API 명세서](docs/ui-api-spec.md) | 구현된 다시봄 화면의 상태 기계, 버튼·셀렉터, 질문 카드 규칙, 세션 데이터, 서버·모듈 API |
 | [화면 정의·사용자 시나리오](docs/screen-spec.md) | 현재 화면과 계획 화면, 상태·버튼·실패 흐름 |
 | [현재 구현 흐름 YAML](docs/scenarios.yaml) | 기존 화면의 S1–S4. 계획 흐름 S5–S11은 화면 명세에 분리 |
 | [검증 계획서·실행 결과](docs/validation-plan.md) | 기능별 검증, 사용자 과업 실험, 실행 증거·한계 |
