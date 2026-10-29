@@ -10,6 +10,9 @@ import { CONDITIONS, QUESTION_LIMIT, REASONS, expectedSentence, keywordsOf, prac
 import { GazeTracker } from "./gaze.js"
 import { MediaCapture, SpeechCapture } from "./recorder.js"
 import { deleteSession, getSession, listSessions, saveSession } from "./storage.js"
+import { measurementCards } from "./measurement-ui.js"
+import { sessionScript } from "./script.js"
+import { createScriptImport } from "./script-ui.js"
 
 const app = document.getElementById("app")
 const SETTINGS_KEY = "dasibom.settings"
@@ -28,8 +31,8 @@ const STEPS = [
   { title: "다시 볼 구간", desc: "긴 침묵·반복·군말·시선 이탈 구간을 찾아, 누르면 그 위치부터 재생해요." },
   { title: "질문과 재연습", desc: "그때 무슨 일이 있었는지 답하면, 바꿔 볼 연습 방법을 제안하고 전후를 비교해요." },
 ]
-const TYPE_GROUP = { silence: "긴 침묵", repeat: "반복·군말", filler: "반복·군말", gaze: "시선 이탈", speed: "속도 변화", section: "구간 시간" }
-const GROUPS = ["긴 침묵", "반복·군말", "시선 이탈", "속도 변화", "구간 시간"]
+const TYPE_GROUP = { silence: "긴 침묵", repeat: "반복·군말", filler: "반복·군말", gaze: "시선 이탈", speed: "속도 변화", section: "구간 시간", blink: "눈 깜빡임" }
+const GROUPS = ["긴 침묵", "반복·군말", "시선 이탈", "속도 변화", "구간 시간", "눈 깜빡임"]
 
 /* ───────── 작은 도우미 ───────── */
 
@@ -107,6 +110,22 @@ const state = {
   hud: null,
 }
 const saveRaw = () => store.set(SETTINGS_KEY, JSON.stringify(state.raw))
+// 대본 TXT 불러오기. 불러온 파일명은 state.raw.scriptFile({ name, edited })에 따로 둔다.
+// 예시 대본 그대로이거나 비어 있으면 바로 바꾸고, 직접 쓰거나 불러온 대본이 있으면 먼저 묻는다.
+const scriptImport = createScriptImport({
+  needsConfirm: (text) => Boolean(state.raw.script?.trim()) && state.raw.script !== SAMPLE_SCRIPT && state.raw.script !== text,
+  apply: (name, text) => {
+    state.raw.script = text
+    state.raw.scriptFile = { name, edited: false }
+    saveRaw()
+  },
+  getFile: () => state.raw.scriptFile || null,
+  onChange: () => renderScript(),
+})
+function scriptEdited() {
+  if (state.raw.scriptFile) state.raw.scriptFile = state.raw.script.trim() ? { ...state.raw.scriptFile, edited: true } : null
+  scriptImport.refresh()
+}
 const busy = () => ["starting", "countdown", "recording", "saving"].includes(state.phase)
 
 /* ───────── 화면 뼈대 ───────── */
@@ -277,6 +296,7 @@ function renderHeader() {
       h(
         "nav",
         { "aria-label": "주 메뉴" },
+        h("a", { href: "/coach.html", "aria-disabled": b ? "true" : null }, "대본 이해 연습"),
         h("a", { id: "nav-import", href: "/import.html", "aria-disabled": b ? "true" : null }, "영상 불러오기"),
         h("a", { id: "nav-history", href: "#/history", "aria-disabled": b ? "true" : null }, "연습 기록"),
         h("button", { type: "button", class: "btn btn-ghost", disabled: b, title: "사용 방법", onclick: () => ((state.onboarding = true), (state.obStep = 0), render()) }, "사용 방법"),
@@ -393,14 +413,14 @@ function renderScript() {
     check("video", "웹캠 영상도 기록 (선택, 소리 기록 포함)", "끄면 카메라 미리보기와 시선 추적은 그대로 두고 소리만 기록해요."),
     SpeechCapture.supported
       ? check("speech", "음성 인식으로 말하기 속도·반복 표현 분석 (선택)", "브라우저에 따라 음성이 브라우저 제공 업체의 음성 인식 서비스로 전송될 수 있어요. 켜지 않으면 전송하지 않아요.")
-      : check("speech", "음성 인식으로 말하기 속도·반복 표현 분석 (선택)", "이 브라우저는 음성 인식을 지원하지 않아서 속도·반복 표현은 분석할 수 없어요.", true),
+      : check("speech", "음성 인식으로 말하기 속도·반복 표현 분석 (선택)", "외부 음성 인식은 사용하지 않아요. 녹음한 파일은 영상 불러오기에서 자체 모델로 전사할 수 있어요.", true),
     h("p", { class: "info" }, "녹화·분석 결과는 이 브라우저 안에만 저장하고 우리 서버로 보내지 않아요."),
   )
   let body
   if (state.editing) {
-    const ta = h("textarea", { class: "input script-edit", "aria-label": "대본", oninput: (e) => ((state.raw.script = e.target.value), saveRaw()) })
+    const ta = h("textarea", { class: "input script-edit", "aria-label": "대본", oninput: (e) => ((state.raw.script = e.target.value), scriptEdited(), saveRaw()) })
     ta.value = state.raw.script
-    body = [ta, h("p", { class: "hint" }, "문장 단위(마침표·줄바꿈)로 나눠서 보여줘요.")]
+    body = [scriptImport.render(b), ta, h("p", { class: "hint" }, "문장 단위(마침표·줄바꿈)로 나눠서 보여줘요.")]
   } else body = sents.length ? h("ol", { class: "sentences" }, items) : h("p", { class: "hint" }, "대본이 비어 있어요. '대본 편집'을 눌러 붙여 넣으세요. 대본 없이도 녹화할 수 있어요.")
   put(scriptCol, 
     h(
@@ -510,7 +530,7 @@ class Practice {
 }
 
 async function startRecording() {
-  if (busy()) return
+  if (busy() || scriptImport.busy()) return
   const { settings, errors } = readSettings(state.raw)
   state.errors = errors
   if (errors.length) return render()
@@ -527,6 +547,7 @@ async function startRecording() {
   }
   await initCamera()
   if (state.gaze.status === "loading") await state.gaze.load() // 모델 준비 중 화면이 멈춰 시계가 건너뛰지 않게 녹화 전에 마친다
+  if (state.media.cam === "ready") await state.gaze.warmup(liveVideo) // 첫 판단의 초기화 멈춤도 녹화 전에 끝낸다
   const { capture, status } = state.media
   const notices = capture ? [] : [...state.media.notices]
   if (!capture && !notices.length) notices.push("마이크·웹캠을 쓸 수 없어 녹음 없이 시간만 측정해요.")
@@ -743,6 +764,7 @@ async function analyze() {
       gaze: { status: gaze.status, segments: gaze.segments, offSec: gaze.offSec }, items,
     },
     script: state.raw.script,
+    scriptFile: state.raw.scriptFile ? { name: state.raw.scriptFile.name, edited: Boolean(state.raw.scriptFile.edited) } : null,
     conds: { keywords: Boolean(state.raw.keywords), progress: Boolean(state.raw.progress), countdown: Boolean(ctx?.conds.includes("countdown")) },
     practiceOf: ctx ? { baseId: ctx.baseId, itemId: ctx.item.id, title: ctx.item.title, startSec: ctx.item.startSec, endSec: ctx.item.endSec, reason: ctx.reason, conds: ctx.conds } : null,
     coaching: {},
@@ -957,6 +979,7 @@ function renderResults() {
     summary,
     sectionCard,
     review,
+    ...measurementCards(session, { h, seek, onUpdated: () => { state.sel = null; renderResults() } }),
     transcriptCard,
     session.practiceOf ? null : compareHost,
     h(
@@ -1049,6 +1072,13 @@ async function fillPracticeCompare(session, host) {
 }
 
 function againSameCondition() {
+  // 그 기록의 대본으로 다시 연습한다. 대본이 저장되지 않은 이전 기록이면 지금 대본을 그대로 쓴다.
+  const { text, fileName } = sessionScript(state.session)
+  if (text !== null) {
+    state.raw.script = text
+    state.raw.scriptFile = fileName ? { name: fileName, edited: Boolean(state.session.scriptFile.edited) } : null
+    saveRaw()
+  }
   clearSession()
   state.phase = "idle"
   state.errors = []

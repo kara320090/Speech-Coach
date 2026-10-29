@@ -3,6 +3,7 @@ import { TARGET_RATE, encodeWav } from "./wav.js"
 import { analyzeFillers, analyzeSilence, analyzeTranscript, buildReviewItems, classifyResult, conditionKey } from "./analysis.js"
 import { decodeToMono16k, planChunks, transcribeChunks, MAX_FILE_BYTES } from "./importer.js"
 import { saveSession } from "./storage.js"
+import { analyzeVideoBlinks, readVideoDuration } from "./video-analysis.js"
 
 const app = document.getElementById("app")
 
@@ -50,7 +51,7 @@ function readInputs(form, file) {
   }
   const tol = num("tol") ?? 0
   if (!Number.isInteger(tol) || tol < 0) errs.push("허용 오차는 0 이상의 정수(초)로 적어 주세요.")
-  return { errs, targetSec, tol, wantText: form.querySelector("#f-text").checked, raw: { tmin: form.querySelector("#f-tmin").value, tsec: form.querySelector("#f-tsec").value, tol: String(tol) } }
+  return { errs, targetSec, tol, wantBlink: form.querySelector("#f-blink").checked, wantText: form.querySelector("#f-text").checked, raw: { tmin: form.querySelector("#f-tmin").value, tsec: form.querySelector("#f-tsec").value, tol: String(tol) } }
 }
 
 function renderForm() {
@@ -89,10 +90,12 @@ function renderForm() {
       h(
         "p",
         { class: "info" },
-        "켜면 영상은 보내지 않고, 이 브라우저가 꺼낸 소리(16kHz 모노, 약 20초 조각)만 우리 서버를 거쳐 외부 AI 음성 인식 서비스(Vercel AI Gateway)로 전송돼요. 켜지 않으면 파일과 소리는 이 브라우저 밖으로 나가지 않고, 긴 침묵 찾기만 해요.",
+        "켜면 영상은 보내지 않고, 이 브라우저가 꺼낸 소리(16kHz 모노, 약 20초 조각)만 직접 운영하는 음성 인식 서버로 전송돼요. 외부 AI 제공자에게는 보내지 않아요. 켜지 않으면 파일과 소리는 이 브라우저 밖으로 나가지 않고, 긴 침묵 찾기만 해요.",
       ),
     ),
     errors,
+    h("div", { class: "check" }, h("input", { id: "f-blink", type: "checkbox" }), h("label", { for: "f-blink" }, "영상 눈 깜빡임도 이 기기에서 분석 (선택)")),
+    h("p", { class: "hint" }, "눈 깜빡임은 영상 파일만 분석해요. 영상·얼굴은 전송하지 않으며, 군말 후보 집계는 위 글자 변환을 켠 경우에만 가능해요."),
     h("button", { type: "submit", class: "btn btn-primary" }, "분석 시작"),
   )
   form.addEventListener("submit", (ev) => {
@@ -123,17 +126,21 @@ function renderFailure(message) {
 }
 
 async function run(file, input) {
+  const isVideo = file.type.startsWith("video/") || (!file.type && /\.(mp4|webm|mov)$/i.test(file.name))
   const status = h("p", { class: "lead", role: "status", id: "import-status" }, "소리를 꺼내는 중이에요…")
   show(h("h1", null, "분석하고 있어요"), status)
   let decoded
   try {
     decoded = await decodeToMono16k(file)
   } catch (e) {
-    return renderFailure(e?.message || String(e))
+    if (!isVideo) return renderFailure(e?.message || String(e))
+    try { decoded = { samples: new Float32Array(0), durationSec: await readVideoDuration(file) } }
+    catch { return renderFailure(e?.message || String(e)) }
   }
   const { samples, durationSec } = decoded
   const total = Math.floor(durationSec)
   const notices = [`불러온 파일의 소리를 이 브라우저 안에서 분석했어요. 영상 파일은 서버로 보내지 않았어요.`]
+  if (!samples.length) notices[0] = "영상의 소리를 읽지 못해 소리 분석·글자 변환은 하지 않았어요. 영상은 이 기기에만 저장하고 눈 깜빡임을 분석할 수 있어요."
 
   status.textContent = "긴 침묵을 찾는 중이에요…"
   await new Promise((r) => setTimeout(r, 0))
@@ -144,7 +151,7 @@ async function run(file, input) {
   let transcript = null
   let segments = []
   let speechState = "off"
-  if (input.wantText) {
+  if (input.wantText && samples.length) {
     const chunks = planChunks(samples, TARGET_RATE)
     status.textContent = `글자로 바꾸는 중이에요… (0/${chunks.length})`
     const res = await transcribeChunks(samples, chunks, {
@@ -156,7 +163,7 @@ async function run(file, input) {
       segments = res.segments
       transcript = analyzeTranscript(segments, total)
       speechState = transcript.status === "ok" ? "ok" : "no-text"
-      notices.push("소리 조각을 외부 음성 인식 서비스로 보내 글자로 바꿨어요.")
+      notices.push("소리 조각을 자체 음성 인식 서버에서 글자로 바꿨어요.")
     } else {
       speechState = "error"
       notices.push(
@@ -167,10 +174,17 @@ async function run(file, input) {
     }
   }
 
+  let blink = null
+  if (input.wantBlink) {
+    const controller = new AbortController()
+    const cancel = h("button", { type: "button", onclick: () => controller.abort() }, "눈 깜빡임 분석 취소")
+    app.append(cancel)
+    blink = await analyzeVideoBlinks(isVideo ? file : null, { signal: controller.signal, onProgress: (at, all, message) => { status.textContent = `${message} ${Math.floor(at / all * 100)}%` } })
+    cancel.remove()
+  }
   const fillers = speechState === "ok" ? analyzeFillers(segments) : null
-  const items = buildReviewItems({ silence, transcript, sectionRows: [], toleranceSec: input.tol, fillers })
+  const items = buildReviewItems({ silence, transcript, blink, sectionRows: [], toleranceSec: input.tol, fillers })
   const result = classifyResult(total, input.targetSec, input.tol)
-  const isVideo = file.type.startsWith("video/")
   const settings = {
     targetSec: input.targetSec, toleranceSec: input.tol, warnSec: 0, speedMin: null, speedMax: null,
     sections: [], planSignature: "", recordAudio: true, recordVideo: false, speechRequested: input.wantText,
@@ -186,10 +200,10 @@ async function run(file, input) {
     result,
     marks: [],
     sectionRows: [],
-    media: { audio: "ok", video: isVideo ? "ok" : "off", speech: speechState, speechDetail: "" },
-    analysis: { silence: { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio }, transcript, fillers: fillers && { count: fillers.count, times: fillers.times }, gaze: { status: "off" }, items },
+    media: { audio: samples.length ? "ok" : "off", video: isVideo ? "ok" : "off", speech: speechState, speechDetail: "" },
+    analysis: { silence: { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio }, transcript, blink, fillers: fillers && { count: fillers.count, times: fillers.times }, gaze: { status: "off" }, items },
     transcript: segments,
-    audioBlob: encodeWav(samples, TARGET_RATE),
+    audioBlob: samples.length ? encodeWav(samples, TARGET_RATE) : null,
     videoBlob: isVideo ? file : null,
     notices,
   }

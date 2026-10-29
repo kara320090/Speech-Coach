@@ -39,6 +39,17 @@ test("chunkSegments: 구간 정보는 파일 시간으로 옮기고, 없으면 �
 const okRes = (body) => ({ ok: true, status: 200, json: async () => body })
 const errRes = (status, body = {}) => ({ ok: false, status, json: async () => body })
 
+test("chunkSegments: null/blank times are not zero; aliases sort and clamp to chunk", () => {
+  const chunk = { startSec: 40, endSec: 60 }
+  const result = chunkSegments(chunk, { text: "fallback", segments: [
+    { text: "invalid", startSecond: null, endSecond: 2 },
+    { text: "blank", startSecond: "", endSecond: 3 },
+    { text: "last", start: "19", end: "20.5" },
+    { text: "first", startSecond: 1, endSecond: 2 }, null,
+  ] })
+  assert.deepEqual(result, [{ startSec: 41, endSec: 42, text: "first" }, { startSec: 59, endSec: 60, text: "last" }])
+})
+
 test("transcribeChunks: 모든 조각이 성공하면 시간순 글 조각을 돌려주고 진행 상황을 알린다", async () => {
   const samples = tone(65)
   const chunks = planChunks(samples, R)

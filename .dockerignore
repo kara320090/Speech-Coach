@@ -5,3 +5,5 @@ tests
 .github
 docs
 progress.md
+local-ai/runtime.local.json
+local-ai/*.pem

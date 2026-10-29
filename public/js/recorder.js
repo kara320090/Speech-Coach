@@ -190,10 +190,11 @@ export class SpeechCapture {
   }
 
   static get supported() {
-    return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
+    return false // 외부 제공자 처리 가능성이 있는 Web Speech 경로는 자체 실행 방식에서 사용하지 않는다.
   }
 
   start() {
+    if (!SpeechCapture.supported) { this.status = "unsupported"; return }
     const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!Ctor) {
       this.status = "unsupported"

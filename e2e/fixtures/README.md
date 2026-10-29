@@ -20,3 +20,5 @@ await page
 await page.getByRole("button", { name: "업로드" }).click()
 await expect(page.getByRole("listitem").filter({ hasText: "lecture-03.pdf" })).toBeVisible()
 ```
+
+`blank-30s.webm`: 320×240 단색 JPEG 프레임 600장을 20fps VP8로 인코딩한 30초 합성 영상(소리·얼굴 없음, 18KB). Playwright 번들 FFmpeg의 image2pipe/mjpeg→libvpx로 생성했다. 실제 인물 자료가 아니며 모델 미검출·영상 탐색 테스트용이다. measurements.spec.ts의 성공 시계열은 별도 가짜 blendshape 모델을 사용한다.

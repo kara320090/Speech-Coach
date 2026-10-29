@@ -70,14 +70,15 @@ export function chunkSegments(chunk, resp) {
   const len = chunk.endSec - chunk.startSec
   const out = []
   for (const s of Array.isArray(resp?.segments) ? resp.segments : []) {
-    const a = Number(s.startSecond)
-    const b = Number(s.endSecond)
-    const text = String(s.text || "").trim()
+    const number = (v) => (typeof v === "number" || (typeof v === "string" && v.trim())) ? Number(v) : NaN
+    const a = number(s?.startSecond ?? s?.start)
+    const b = number(s?.endSecond ?? s?.end)
+    const text = typeof s?.text === "string" ? s.text.trim() : ""
     if (text && Number.isFinite(a) && Number.isFinite(b) && a >= 0 && b >= a && b <= len + 1) {
       out.push({ startSec: chunk.startSec + Math.min(a, len), endSec: chunk.startSec + Math.min(b, len), text })
     }
   }
-  if (out.length) return out
+  if (out.length) return out.sort((a, b) => a.startSec - b.startSec)
   const text = String(resp?.text || "").trim()
   return text ? [{ startSec: chunk.startSec, endSec: chunk.endSec, text }] : []
 }

@@ -1,18 +1,17 @@
-# 주최 측 실행과 CI가 쓰는 구성. 서비스는 app 하나이고, 녹음·분석·기록은 브라우저 안에서 처리한다.
-# 서버가 하는 일은 정적 파일 제공, /__health, 그리고 "영상 불러오기"에서 사용자가 글자 변환을 켰을 때 소리 조각을 AI Gateway로 넘겨 주는 /api/transcribe 뿐이다.
-# AI_GATEWAY_API_KEY가 없으면 /api/transcribe는 503(not-configured)로 답하고, 나머지 기능은 그대로 동작한다.
+# Host scenarios run without any model. AI needs separately provisioned local processes.
+# Loopback inside a container is the container itself, not the developer's computer.
 services:
   app:
     build:
       context: .
       args:
-        # 주최 측 실행과 CI가 실행하는 commit SHA. /__health의 releaseId로 응답한다.
         RELEASE_ID: ${RELEASE_ID:-dev}
     ports:
       - "3000:3000"
     environment:
       RELEASE_ID: ${RELEASE_ID:-dev}
-      # 값은 환경변수로만 받는다. 저장소·프론트엔드·로그에 넣지 않는다.
-      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
-      TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
-      TRANSCRIBE_TOTAL_SECONDS: ${TRANSCRIBE_TOTAL_SECONDS:-}
+      TRANSCRIBE_TOTAL_SECONDS: ${TRANSCRIBE_TOTAL_SECONDS:-3600}
+      # 텍스트 AI 공급자. 기본 local이라 CI·주최 측 실행은 Gemini를 부르지 않는다. 키는 환경변수로만 받는다.
+      AI_PROVIDER: ${AI_PROVIDER:-local}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
