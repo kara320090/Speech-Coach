@@ -2,7 +2,7 @@
 
 ## 공개 웹과 자체 AI 연결
 
-- 프론트엔드: Vercel의 `Other` 프리셋, 출력 폴더 `public`. `vercel.json`이 `/api/*`와 `/__health`를 Render 백엔드로 전달한다.
+- 프론트엔드: [공개 웹](https://speech-coach-public.vercel.app/), Vercel의 `Other` 프리셋, 출력 폴더 `public`. `vercel.json`이 `/api/*`와 `/__health`를 Render 백엔드로 전달한다.
 - 백엔드: `https://speech-coach-2j01.onrender.com`. 화면·코칭·전사·파일 가져오기 API를 제공한다.
 - 자체 AI: 운영 PC에서 Qwen·faster-whisper를 직접 실행한다. `npm run start:agent`가 모델을 시작하고 Render의 서명된 작업을 처리한다. 외부 AI 제공자 API나 추가 학습은 사용하지 않는다.
 - 요청마다 Ed25519 서명·본문 해시·시간·재전송 여부를 확인한다. Git에는 공개 키만 포함하고 개인 키·모델·개인 실행 설정은 운영 PC에 보관한다.
