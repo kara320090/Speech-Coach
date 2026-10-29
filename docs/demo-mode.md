@@ -17,6 +17,6 @@
 
 ## 제출 검사
 
-`docs/scenarios.yaml`의 S5와 `e2e/scenarios/S5.spec.ts`가 위 흐름을 실제 화면 조작으로 확인한다. API 가로채기·가짜 API 응답·테스트 건너뛰기를 사용하지 않는다. 적용 전 확인, 새로고침 보존, 원문 복원, API POST 0건을 검증한다.
+`docs/scenarios.yaml`의 S7와 `e2e/scenarios/S7.spec.ts`가 위 흐름을 실제 화면 조작으로 확인한다. API 가로채기·가짜 API 응답·테스트 건너뛰기를 사용하지 않는다. 적용 전 확인, 새로고침 보존, 원문 복원, API POST 0건을 검증한다.
 
-기본 제출 흐름은 S1–S5·S9의 6개다. 이 예시의 통과는 모델 추론·음성 인식·감정 파악의 정확도를 검증한 것이 아니다. 실제 AI 경로와 실행 환경은 [Gateway 안내](ai-gateway.md), [자체 AI 실행 안내](../local-ai/README.md)를 따른다.
+기본 제출 흐름은 S1–S7·S9의 8개다. 이 예시의 통과는 모델 추론·음성 인식·감정 파악의 정확도를 검증한 것이 아니다. 실제 AI 경로와 실행 환경은 [Gateway 안내](ai-gateway.md), [자체 AI 실행 안내](../local-ai/README.md)를 따른다.

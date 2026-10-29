@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { openMain } from "../fixtures/flow"
 
-test("S5 학생이 시연용 예시로 상황 질문·수정 허락·대본 적용과 원문 복원을 체험한다", async ({ page }) => {
+test("S7 학생이 시연용 예시로 상황 질문·수정 허락·대본 적용과 원문 복원을 체험한다", async ({ page }) => {
   const calls: string[] = []
   page.on("request", request => { if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/")) calls.push(request.url()) })
   await openMain(page)
