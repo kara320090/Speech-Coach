@@ -33,3 +33,6 @@ Thumbs.db
 .idea/
 
 # 큰 데이터 파일(데이터셋·영상 등)은 커밋하지 않는다. E2E 입력 자료는 e2e/fixtures/에 10MB 이하로 둔다.
+
+# 가짜 마이크 검사용으로 e2e/fixtures/make-fake-speech.mjs가 만드는 파일
+e2e/fixtures/fake-speech.wav

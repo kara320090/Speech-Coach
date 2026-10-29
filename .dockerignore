@@ -1,0 +1,7 @@
+node_modules
+e2e
+tests
+.git
+.github
+docs
+progress.md

@@ -1,0 +1,13 @@
+# 주최 측 실행과 CI가 쓰는 구성. 이 서비스는 녹음·분석·기록을 모두 브라우저 안에서 처리하므로 서버 쪽 DB·로그인·AI 호출이 없다.
+# 그래서 서비스는 app 하나이고, 시드 계정·DATABASE_URL은 두지 않는다.
+services:
+  app:
+    build:
+      context: .
+      args:
+        # 주최 측 실행과 CI가 실행하는 commit SHA. /__health의 releaseId로 응답한다.
+        RELEASE_ID: ${RELEASE_ID:-dev}
+    ports:
+      - "3000:3000"
+    environment:
+      RELEASE_ID: ${RELEASE_ID:-dev}
