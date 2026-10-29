@@ -13,6 +13,7 @@
 | 설치형 앱을 원하지 않음 | 브라우저 녹음·편집·결과 제공 | 전 기능 | 사용자 설치를 요구하지 않는 웹 구조 |
 | 반복 표현의 이유를 측정만으로 알 수 없음 | 관찰 교정·짧은 상황 질문·미확인 상태 | F13 | 사용자 설명은 인과 증명의 결과가 아님 |
 | 하지 말라는 지시만으로 준비 조건을 바꾸기 어려움 | 선택 가능한 단서·화면·구간 연습과 조건 시험 | F14, F11 | 효과 없음·악화·부담도 함께 기록 |
+| AI 도구로 만든 대본을 완벽히 숙지하지 못함(팀 관찰), “이해했다”는 답이 실제와 다를 수 있음 | 이해 교차 확인 질문, 응답별 대본 다듬기, 원문·설명·수정안·발화 교차검증 | F15, F9–F11 | 이해 부족 자동 판정 금지, 원문에 없는 사실 추가 금지 |
 
 ## 2. 현재 구현 구조
 
@@ -127,6 +128,23 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 - 적용: 사용자가 조치를 선택하지 않으면 대본·화면을 바꾸지 않는다. 적용 전 미리보기를 보이고 적용·거절·되돌리기를 지원한다. 되돌리면 `beforeSettings`로 복원하고 이력을 남긴다.
 - 실패: 단서 생성 자료 부족(원문 대본 없음)이면 사용자가 직접 핵심어를 입력하거나 다른 옵션을 고르게 한다. 원문에 없는 사실을 단서에 추가하지 않는다. 재연습 분석 실패 시 `uncertain`으로 두고 0회로 기록하지 않는다.
 
+### 4.8 대본 이해·숙지 교차 확인과 교차검증 (F15)
+
+후보 구간 규칙(판정 아님): 같은 `sectionId`에서 ① 긴 침묵·반복이 있거나 ② 전사와 대본의 대응이 낮거나(건너뜀·크게 다른 발화) ③ 사용자가 직접 표시한 경우. 전사 품질이 낮으면 ②를 쓰지 않고 그 사실을 표시한다.
+
+상태: `comprehension: unasked → understood / unsure / awkwardWording / skipped`. 응답이 없으면 `unasked`로 남기며 `notUnderstood` 같은 판정 상태는 두지 않는다. `understood`는 자기 말 설명·원문 기반 확인 질문으로 다시 확인해 `verification: unchecked → consistent / gapFound / skipped`로 별도 기록한다. `gapFound`는 “설명과 원문이 다른 부분”이며 거짓 응답이라는 뜻으로 쓰지 않는다. 다듬기 제안은 `Suggestion`을 재사용하고 `origin: comprehension`, `basis: userExplanation | sourceSummary | wording`을 기록한다.
+
+교차검증 규칙:
+
+| 비교 | 계산·판단 | 상태 값 |
+| --- | --- | --- |
+| 원문 ↔ 사용자 설명 | 필수 항목·핵심 개념 대조, 의미 차이는 근거 문장과 함께 표시 | match / missing / differs(확인 필요) / uncertain |
+| 원문 ↔ 수정안 | F10 보존 검사 그대로 | preserved / missing / changed / uncertain |
+| 수정안 ↔ 재연습 발화 | 구간 대응·차이 표시, 그대로 읽음/자기 말로 전달 구분은 사용자 확인 | aligned / paraphrased / divergent / uncertain |
+| 이전 ↔ 재연습 | 같은 구간의 긴 침묵·반복·시간, 분석 가능 길이 | improved / noClearChange / worse / uncertain |
+
+비교 조건이 다르면(구간·분석 버전·부분/전체) 비교 제한을 표시한다. 사용자 설명과 원문이 다를 때 원문 오류일 가능성도 있으므로 어느 쪽도 자동 수정하지 않는다. 외부 AI가 다듬기를 만들면 보낼 범위는 해당 구간 원문과 사용자가 확인한 설명 요약으로 제한하고, 실패·취소 시 원문과 기존 결과를 보존한다.
+
 ## 5. 데이터 설계
 
 | 객체 | 주요 필드 | 상태 |
@@ -142,6 +160,7 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 | RehearsalComparison | previousSessionId, currentSessionId, conditionsMatch, differences, issueResults, humanReviewStatus, trialId, interventionDifference, confounds | 계획 |
 | CoachingInquiry | id, issueId, observationStatus, correctedEvidence, questionCount, answers, userReportSummary, causeStatus, userConfirmed, skipped | 계획·원인 확정/감정 자동 판정 없음 |
 | PracticeAdjustment | id, inquiryId, type, sourceSectionIds, cueText, beforeSettings, afterSettings, userSelected, revertedAt, realPresentationConstraints | 계획·원문 별도 보존 |
+| ComprehensionCheck | id, sessionId, sectionId, scriptVersionId, candidateReasons, aiAuthoredFlag(사용자 선택), comprehension, verification, checkQuestions[{question, sourceSpan, answerLocal, result}], userExplanationLocal, explanationSummary, crossCheck{sourceVsExplanation, sourceVsSuggestion, suggestionVsSpeech, beforeVsAfter}, suggestionIds, rehearsalSessionId | 계획·이해 여부 자동 판정 없음, 설명 원문 로컬 |
 | ConditionTrial | id, adjustmentId, baselineSessionId, trialSessionId, controlledConditions, confounds, fillerCount, analyzedSeconds, contentResults, durationResults, optionalBurdenResponse, outcome, userReview | 계획·단일 회차의 인과 확정 금지 |
 
 원본 녹음은 사용자 브라우저 보관을 기본으로 한다. 버전 마이그레이션 실패 시 기존 세션을 덮어쓰지 않는다. 보관 기간·크기 한도는 장치 시험 후 정하고, 임의로 오래된 기록을 자동 삭제하지 않는다. 비밀키는 어떤 저장 객체에도 포함하지 않는다. CoachingInquiry 답변 원문은 기본 로컬 보관하며 외부 전송·내보내기에 자동 포함하지 않는다. 삭제 요청 시 연결된 답변·요약·시험도 포함할 범위를 보여 주고 삭제 여부를 확인한다.
@@ -155,6 +174,7 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 | `POST /api/transcribe` | 구현(번호 미배정) | 사용자가 글자 변환을 켠 영상 불러오기에서 WAV 조각을 AI Gateway로 중계. 503/415/413/429/502 구분. 실제 게이트웨이 호출 미검증, 상세는 [import-feature.md](import-feature.md) |
 | `POST /api/revisions` | 계획 | 대본·필수 항목·시간 조건·실측 요약으로 제안 생성. baseVersionId와 requestId 반환 |
 | `POST /api/content-checks` | 계획 | 제공 근거와 수정문/발화의 일치 검사. 항목 ID별 상태·근거 반환 |
+| `POST /api/script-rephrase` | 계획 | F15: 해당 구간 원문·사용자 설명 요약·다듬기 유형으로 자연스러운 말투 제안 생성. 사용자가 전송을 선택한 경우만 호출, 원문에 없는 사실 추가 금지 |
 
 계획 API의 최소 규칙: 입력 검증 실패 400, 크기 초과 413, 사용 한도 429, 외부 처리 실패 502/504. 사용자에게 복구 가능한 안내를 제공하고 원문을 보존한다. 실제 응답 코드·스키마는 구현 시 확정하고 테스트한다. AI_GATEWAY_API_KEY 같은 비밀값은 서버 환경에서만 읽는다. 계획 경로(`/api/revisions`, `/api/content-checks`)가 존재한다고 README에 안내하지 않는다.
 
@@ -167,6 +187,8 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
           실패/취소 ─→ 원문·기존 결과 유지
 결과 → 관찰 확인 → 상황 질문(선택) → 연습 조건 선택 → 적용·재연습 → 변화 확인
           오탐/건너뛰기 ─→ 기존 연습 계속       거절/되돌리기 ─→ 이전 조건 유지
+결과 → 이해 확인 질문 → 응답 분기(이해함/모르겠음/어색함) → (이해함이면) 자기 말 설명·확인 질문 교차검증 → 대본 다듬기 제안 → 선택·새 버전 → 재연습 → 4열 교차검증
+          건너뛰기 ─→ 기존 결과           거절/되돌리기 ─→ 원문 유지
 ```
 
 | 상황 | 사용자에게 보일 상태 | 복구 |
@@ -195,6 +217,7 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 | 항목별 재점검 | 측정값 비교만 존재 | R2는 F13–F14·조건 기록·사용자 확인, R3에서 F9–F10 수정안까지 연결 |
 | 상황·원인 질문 | 측정값만 있고 질문 흐름 없음 | F13, 재생 확인·사용자 교정·선택권 |
 | 연습 조건 시험 | 단서 생성·조건 버전·시험 비교 없음 | F14 및 F11 확장, 실제 사용자 과업 검증 |
+| 대본 이해 교차 확인 | 대본·구간 대응·이해 질문·다듬기·교차검증 없음 | F7 대본, 전사-대본 대응, F9–F10, 외부 AI 전송 안내 |
 | 저장·삭제 실패 | 저장 안내 존재, 삭제 결과를 화면에서 확인하지 않음 | 오류 전달·재시도 UX·실제 저장소 시험 |
 | 운영 검증 | 단위 40개(`9d2a10b`) 및 기존 Docker·health·S1–S4 CI 4개 성공 확인 | 실제 장치·미디어 별도 검사·신규 기능·공개 배포 검증 |
 
