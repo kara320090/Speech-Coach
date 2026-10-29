@@ -1,10 +1,11 @@
-// 외부 패키지 없이 public/ 폴더의 정적 파일, /__health, 글자 변환 중계(/api/transcribe)를 제공하는 서버.
-// 녹음·영상·분석은 브라우저 안에서 처리한다. 사용자가 '글자로 변환'을 직접 켠 경우에만 영상에서 꺼낸 소리 조각(WAV)이
-// /api/transcribe를 거쳐 AI Gateway의 음성 인식 모델로 전송된다. 영상 파일 자체는 서버로 오지 않는다.
+// Node 22 web server with loopback-only, self-hosted model processing. No external AI provider calls.
 import http from "node:http"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+
+import { createLocalCoach, CoachError, LIMITS } from "./server/local-coach.js"
+import { createLocalTranscriber } from "./server/local-transcribe.js"
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "public")
 const MIME = {
@@ -30,12 +31,6 @@ const HEADERS = {
 
 const NOT_FOUND_HTML = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>페이지를 찾을 수 없어요</title></head><body><main><h1>페이지를 찾을 수 없어요</h1><p><a href="/">발표 연습 코치 첫 화면으로 가기</a></p></main></body></html>`
 
-const DEFAULT_GATEWAY_URL = "https://ai-gateway.vercel.sh"
-const DEFAULT_MODEL = "google/gemini-3.5-transcribe"
-const MAX_BODY_BYTES = 4 * 1024 * 1024 // 16kHz 모노 WAV 약 2분
-const DEFAULT_TOTAL_SECONDS = 3600 // 서버가 켜져 있는 동안 변환할 수 있는 소리 길이의 합(팀 예산 보호)
-const WAV_BYTES_PER_SEC = 16000 * 2
-
 function sendJson(res, status, body) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...HEADERS })
   res.end(JSON.stringify(body))
@@ -52,83 +47,43 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks)
 }
 
-/** 게이트웨이가 준 구간 정보에서 글자와 시간만 숫자로 정리한다. 모양이 다르면 빈 목록. */
-function cleanSegments(raw) {
-  if (!Array.isArray(raw)) return []
-  const out = []
-  for (const s of raw) {
-    const text = typeof s?.text === "string" ? s.text.trim() : ""
-    const number = (v) => (typeof v === "number" || (typeof v === "string" && v.trim())) ? Number(v) : NaN
-    const startSecond = number(s?.startSecond ?? s?.start)
-    const endSecond = number(s?.endSecond ?? s?.end)
-    if (text && Number.isFinite(startSecond) && Number.isFinite(endSecond) && startSecond >= 0 && endSecond >= startSecond) out.push({ text, startSecond, endSecond })
-  }
-  return out.sort((a, b) => a.startSecond - b.startSecond)
-}
-
 export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch } = {}) {
-  let transcribedSeconds = 0
-  const totalLimit = Number(env.TRANSCRIBE_TOTAL_SECONDS) > 0 ? Number(env.TRANSCRIBE_TOTAL_SECONDS) : DEFAULT_TOTAL_SECONDS
+  const coach = createLocalCoach({ env, fetchImpl })
+  const transcriber = createLocalTranscriber({ env, fetchImpl })
 
-  async function transcribe(req, res) {
-    const apiKey = env.AI_GATEWAY_API_KEY
-    if (!apiKey) return sendJson(res, 503, { error: "not-configured", message: "서버에 AI_GATEWAY_API_KEY가 설정되어 있지 않아서 글자 변환을 쓸 수 없어요." })
-    const body = await readBody(req, MAX_BODY_BYTES)
-    if (!body) return sendJson(res, 413, { error: "too-large", message: "보낸 소리 조각이 너무 길어요." })
-    const isWav = body.length > 44 && body.toString("latin1", 0, 4) === "RIFF" && body.toString("latin1", 8, 12) === "WAVE"
-    if (!isWav) return sendJson(res, 415, { error: "not-wav", message: "WAV 소리 조각만 받을 수 있어요." })
-    const seconds = (body.length - 44) / WAV_BYTES_PER_SEC
-    if (transcribedSeconds + seconds > totalLimit) return sendJson(res, 429, { error: "budget", message: "이 서버가 글자로 바꿀 수 있는 소리 길이 한도에 도달했어요." })
-    transcribedSeconds += seconds
-    let upstream
+  async function api(req, res, pathname) {
+    const controller = new AbortController()
+    const abort = () => { if (!res.writableEnded) controller.abort() }
+    res.on("close", abort)
     try {
-      upstream = await fetchImpl(`${(env.AI_GATEWAY_URL || DEFAULT_GATEWAY_URL).replace(/\/+$/, "")}/v4/ai/transcription-model`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "ai-gateway-protocol-version": "0.0.1",
-          "ai-transcription-model-specification-version": "4",
-          "ai-model-id": env.TRANSCRIBE_MODEL || DEFAULT_MODEL,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ audio: body.toString("base64"), mediaType: "audio/wav" }),
-        signal: AbortSignal.timeout(90_000),
-      })
-    } catch {
-      transcribedSeconds -= seconds
-      return sendJson(res, 502, { error: "gateway-unreachable", message: "음성 인식 서비스에 연결하지 못했어요." })
-    }
-    if (!upstream.ok) {
-      transcribedSeconds -= seconds
-      if (upstream.status === 401 || upstream.status === 403) return sendJson(res, 502, { error: "gateway-auth", message: "음성 인식 서비스가 키를 받아들이지 않았어요. 키와 팀 접근 권한을 확인해 주세요." })
-      if (upstream.status === 429) return sendJson(res, 429, { error: "gateway-limit", message: "음성 인식 서비스의 사용 한도에 걸렸어요. 잠시 뒤에 다시 해 주세요." })
-      return sendJson(res, 502, { error: "gateway-error", status: upstream.status, message: "음성 인식 서비스가 오류를 돌려줬어요." })
-    }
-    let data
-    try {
-      data = await upstream.json()
-    } catch {
-      transcribedSeconds -= seconds
-      return sendJson(res, 502, { error: "gateway-error", message: "음성 인식 서비스의 응답을 읽지 못했어요." })
-    }
-    sendJson(res, 200, {
-      text: typeof data?.text === "string" ? data.text : "",
-      segments: cleanSegments(data?.segments),
-      language: typeof data?.language === "string" ? data.language : null,
-      durationInSeconds: Number.isFinite(Number(data?.durationInSeconds)) ? Number(data.durationInSeconds) : null,
-    })
+      if (pathname === "/api/model-status") {
+        if (req.method !== "GET") return sendJson(res, 405, { error: "method" })
+        return sendJson(res, 200, { ...await coach.status(), transcriptionConfigured: transcriber.configured })
+      }
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" })
+      if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return sendJson(res, 403, { error: "origin", message: "이 페이지에서 시작한 요청만 처리할 수 있어요." })
+      if (pathname === "/api/transcribe") {
+        const body = await readBody(req, 4 * 1024 * 1024)
+        const result = await transcriber.run(body, controller.signal)
+        if (!res.destroyed) sendJson(res, result.status, result.body)
+        return
+      }
+      if (!(req.headers["content-type"] || "").startsWith("application/json")) return sendJson(res, 415, { error: "content-type", message: "JSON 형식으로 보내 주세요." })
+      const body = await readBody(req, LIMITS.body)
+      if (!body) return sendJson(res, 413, { error: "too-large", message: "입력이 너무 커요. 짧은 구간으로 나누어 주세요." })
+      let data
+      try { data = JSON.parse(body.toString("utf8")) } catch { return sendJson(res, 400, { error: "invalid-json", message: "요청을 읽지 못했어요." }) }
+      const result = await coach.run(data, controller.signal)
+      if (!res.destroyed) sendJson(res, 200, result)
+    } catch (e) {
+      if (!res.destroyed) sendJson(res, e instanceof CoachError ? e.status : 400, { error: e instanceof CoachError ? e.code : "invalid-request", message: e instanceof CoachError ? e.message : "요청을 처리하지 못했어요. 원문은 보존돼요." })
+    } finally { res.off("close", abort) }
   }
 
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://localhost")
-      if (url.pathname === "/api/transcribe") {
-        if (req.method !== "POST") {
-          res.writeHead(405, { Allow: "POST", ...HEADERS })
-          return res.end()
-        }
-        return await transcribe(req, res)
-      }
+      if (["/api/transcribe", "/api/coach", "/api/model-status"].includes(url.pathname)) return await api(req, res, url.pathname)
       if (req.method !== "GET" && req.method !== "HEAD") {
         res.writeHead(405, { Allow: "GET, HEAD", ...HEADERS })
         return res.end()

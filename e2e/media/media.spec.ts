@@ -91,84 +91,32 @@ test.describe("가짜 마이크·웹캠으로 기록하고 구간으로 이동",
   })
 })
 
-test.describe("음성 인식(가짜 구현): 속도·반복 표현 분석 흐름", () => {
-  test("인식 결과가 들어오면 실시간 속도·평균 속도·반복 표현이 나온다", async ({ page }) => {
-    // 브라우저의 SpeechRecognition을 가짜로 바꿔 인식 결과가 들어오는 상황을 만든다. 실제 음성 인식 서비스를 쓴 검사가 아니다.
+test.describe("외부 음성 인식 비활성화", () => {
+  test("브라우저 음성 인식 구현이 있어도 외부 처리 경로를 시작하지 않는다", async ({ page }) => {
     await page.addInitScript(() => {
-      const script: Array<[number, number, string, boolean]> = [
-        [500, 0, "그 그 그러니까 오늘 발표를", false],
-        [1500, 0, "그 그 그러니까 오늘 발표를 시작하겠습니다", true],
-        [3000, 1, "음악 음악 음악 이야기를", false],
-        [5000, 1, "음악 음악 음악 이야기를 먼저 해 보겠습니다", true],
-        [8000, 2, "다음으로 연습이 왜 필요한지 말씀드리겠습니다", true],
-        [11000, 3, "마지막으로 정리하겠습니다 감사합니다", true],
-      ]
-      class FakeRec {
-        lang = ""
-        continuous = false
-        interimResults = false
-        onresult: ((e: unknown) => void) | null = null
-        onerror: ((e: unknown) => void) | null = null
-        onend: (() => void) | null = null
-        timers: number[] = []
-        start() {
-          const results: Array<{ 0: { transcript: string }; isFinal: boolean }> = []
-          for (const [at, idx, text, fin] of script) {
-            this.timers.push(
-              window.setTimeout(() => {
-                results[idx] = { 0: { transcript: text }, isFinal: fin }
-                this.onresult?.({ resultIndex: idx, results })
-              }, at),
-            )
-          }
-        }
-        stop() {
-          this.timers.forEach(clearTimeout)
-          setTimeout(() => this.onend?.(), 0)
-        }
-      }
-      ;(window as any).webkitSpeechRecognition = FakeRec
-      ;(window as any).SpeechRecognition = FakeRec
+      ;(window as any).externalSpeechCalls = 0
+      ;(window as any).SpeechRecognition = class { start() { (window as any).externalSpeechCalls++ } }
     })
-    await startPractice(page, {
-      seconds: "20",
-      speech: true,
-      extra: async () => {
-        await page.getByLabel("최소(분당 음절)").fill("100")
-        await page.getByLabel("최대(분당 음절)").fill("200")
-      },
-    })
-    await expect(page.getByTestId("speed")).toContainText("측정 중")
-    await expect(page.getByTestId("elapsed")).toHaveText("0:12")
-    await expect(page.getByTestId("speed")).toContainText("음절/분")
-    await expect(page.getByTestId("speed")).toContainText(/목표 (범위 안|최대|최소)/)
+    await page.goto("/")
+    await expect(page.getByLabel("음성 인식으로 말하기 속도")).toBeDisabled()
+    await expect(page.getByText("외부 음성 인식은 사용하지 않아요.", { exact: false })).toBeVisible()
+    await page.getByLabel("목표 시간 초").fill("20")
+    await page.getByRole("button", { name: "연습 시작" }).click()
     await page.getByRole("button", { name: "연습 종료" }).click()
-
-    const avg = page.getByTestId("avg-speed")
-    await expect(avg).toContainText("음절/분")
-    await expect(avg).toContainText("한글 음절")
-    const items = page.getByRole("list", { name: "검토할 구간 목록" })
-    await expect(items).toContainText('같은 말을 이어서 반복: "그"')
-    await expect(items).toContainText('"음악"')
-    await expect(page.getByText("인식된 글 보기")).toBeVisible()
-    // 숫자는 화면의 계산 근거와 맞아야 한다: 한글 음절 수 ÷ 연습 시간(분)
-    const text = await avg.innerText()
-    const rate = Number(text.match(/(\d+) 음절\/분/)![1])
-    const syll = Number(text.match(/한글 음절 (\d+)개/)![1])
-    const totalSec = clock(await page.getByTestId("total").innerText())
-    expect(Math.abs(rate - Math.round(syll / (totalSec / 60)))).toBeLessThanOrEqual(1)
+    expect(await page.evaluate(() => (window as any).externalSpeechCalls)).toBe(0)
   })
+
 })
 
 test.describe("실패 상황", () => {
-  test("음성 인식을 지원하지 않는 브라우저: 속도는 측정 불가로 표시한다", async ({ page }) => {
+  test("음성 인식이 없는 브라우저: 자체 파일 전사 안내와 미측정 상태를 표시한다", async ({ page }) => {
     await page.addInitScript(() => {
       delete (window as any).SpeechRecognition
       delete (window as any).webkitSpeechRecognition
     })
     await page.goto("/")
     await expect(page.getByLabel("음성 인식으로 말하기 속도")).toBeDisabled()
-    await expect(page.getByText("이 브라우저는 음성 인식을 지원하지 않아서")).toBeVisible()
+    await expect(page.getByText("외부 음성 인식은 사용하지 않아요.")).toBeVisible()
     await page.getByLabel("목표 시간 초").fill("20")
     await page.getByRole("button", { name: "연습 시작" }).click()
     await expect(page.getByTestId("speed")).toContainText("측정 안 함")

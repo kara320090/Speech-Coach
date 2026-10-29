@@ -47,7 +47,7 @@ test.describe("영상·소리 파일 불러오기", () => {
     await expect(page.getByText("영상 파일은 서버로 보내지 않았어요")).toBeVisible()
   })
 
-  test("글자 변환을 켜면 소리 조각이 /api/transcribe로 가고, 돌아온 글로 속도·반복 표현을 분석한다 (게이트웨이는 가짜)", async ({ page }) => {
+  test("글자 변환을 켜면 소리 조각이 /api/transcribe로 가고, 돌아온 글로 속도·반복 표현을 분석한다 (자체 전사 응답은 가짜)", async ({ page }) => {
     const requests: { type: string; size: number }[] = []
     await page.route("**/api/transcribe", async (route) => {
       const req = route.request()
@@ -76,12 +76,12 @@ test.describe("영상·소리 파일 불러오기", () => {
     await expect(items).toContainText('"음악"')
     await expect(page.getByTestId("avg-speed")).toContainText("음절/분")
     await expect(page.getByText("인식된 글 보기")).toBeVisible()
-    await expect(page.getByText("외부 음성 인식 서비스로 보내 글자로 바꿨어요")).toBeVisible()
+    await expect(page.getByText("자체 음성 인식 서버에서 글자로 바꿨어요")).toBeVisible()
   })
 
-  test("서버에 AI 키가 없으면 글자 변환만 건너뛰고 긴 침묵 찾기는 그대로 한다", async ({ page }) => {
+  test("자체 전사 worker가 없으면 글자 변환만 건너뛰고 긴 침묵 찾기는 그대로 한다", async ({ page }) => {
     await page.route("**/api/transcribe", (route) =>
-      route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "not-configured", message: "서버에 AI_GATEWAY_API_KEY가 설정되어 있지 않아서 글자 변환을 쓸 수 없어요." }) }),
+      route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "not-configured", message: "자체 음성 인식 모델이 연결되지 않아 글자 변환을 쓸 수 없어요." }) }),
     )
     await openImport(page, { text: true })
     await expect(page.getByRole("region", { name: "연습 결과" })).toBeVisible()

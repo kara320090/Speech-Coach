@@ -36,3 +36,9 @@ Thumbs.db
 
 # 가짜 마이크 검사용으로 e2e/fixtures/make-fake-speech.mjs가 만드는 파일
 e2e/fixtures/fake-speech.wav
+
+# Local inference assets and Python environments
+*.gguf
+models/
+.venv/
+__pycache__/

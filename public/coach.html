@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>대본 이해 연습 · Speech-Coach</title><link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/coach.css">
+</head>
+<body>
+  <header class="top"><a class="brand" href="/">발표 연습 코치</a><nav aria-label="주 메뉴"><a href="/">연습 준비</a><a href="/import.html">영상 불러오기</a><a href="/coach.html" aria-current="page">대본 이해 연습</a></nav></header>
+  <main class="coach-wrap">
+    <p class="eyebrow">대본을 내 말로</p><h1>이해하고, 쉽게 말하고, 다시 설명해요</h1>
+    <p>낯선 표현을 함께 풀어 보고 질문에 답해 보세요. 군말이나 표정으로 이해 상태를 판단하지 않아요.</p>
+    <p id="model-state" role="status">자체 모델 연결을 확인하고 있어요.</p><button id="model-refresh" type="button">모델 연결 다시 확인</button>
+    <section class="coach-panel" aria-labelledby="prepare-title">
+      <h2 id="prepare-title">1. 짧은 대본과 근거 자료</h2>
+      <p>한 번에 대본 2,400자·근거 자료 2,400자까지 다뤄요. 긴 발표는 구간별로 나누어 주세요. 대본과 자료는 이 브라우저에 저장하며, 분석 버튼을 누른 텍스트만 직접 운영하는 모델 서버로 보내요. 외부 AI 제공자에게는 보내지 않아요.</p>
+      <div class="coach-grid">
+        <label>분석할 대본 구간<textarea id="script" rows="7" maxlength="2400" placeholder="발표할 문장을 붙여 넣으세요."></textarea></label>
+        <label>근거 자료 (선택)<textarea id="sources" rows="7" maxlength="2400" placeholder="설명·수치·조건을 확인할 원자료를 붙여 넣으세요. AI 대본 자체가 사실 검증된 자료는 아니에요."></textarea></label>
+      </div>
+      <div class="coach-actions"><button id="save-draft">자료 저장</button><button id="concepts" data-ai>낯선 개념 살펴보기</button><button id="rewrite" data-ai>쉬운 대본 제안</button><button id="cancel" hidden>분석 취소</button></div>
+      <p id="save-state" role="status"></p><p id="request-state" role="status" aria-live="polite"></p>
+    </section>
+    <section class="coach-panel" aria-labelledby="concept-title"><h2 id="concept-title">2. 이해할 개념과 쉬운 표현</h2><div id="concept-list"><p>개념을 선택하거나 아래에서 바로 자기 말로 설명할 수 있어요.</p></div><div id="revision"></div></section>
+    <section class="coach-panel" aria-labelledby="practice-title">
+      <h2 id="practice-title">3. 자기 설명과 예상 질문</h2>
+      <p id="question-text">이 대본에서 전달하려는 내용을 자기 말로 설명해 보세요.</p>
+      <div class="coach-actions"><button id="question" data-ai>예상 질문 연습</button><button id="help">모르겠어요 · 근거 보기</button><button id="skip">이번 질문 건너뛰기</button></div>
+      <div id="reference" hidden></div>
+      <label>내 설명·답변<textarea id="answer" rows="5" maxlength="1000" placeholder="외운 문장을 그대로 쓰지 않아도 괜찮아요. 알고 있는 내용을 적어 보세요."></textarea></label>
+      <div class="coach-actions"><button id="review" data-ai>답변 함께 확인</button><button id="retry">도움 없이 다시 설명</button></div>
+      <p id="attempt-state"></p><div id="feedback" aria-live="polite"></div>
+    </section>
+    <section class="coach-panel" aria-labelledby="history-title"><h2 id="history-title">4. 이전 설명과 이번 설명</h2><p>근거와 실제 답변을 나란히 확인해요. 한 번의 변화나 군말 감소만으로 이해가 좋아졌다고 판단하지 않아요.</p><div id="attempt-history"></div>
+      <div class="coach-actions"><button id="export">기록 내보내기</button><button id="restore">처음 대본으로 되돌리기</button><button id="clear">이 페이지 자료 삭제</button><a href="/">전체 발표 연습으로</a></div>
+    </section>
+  </main>
+  <noscript>이 페이지는 JavaScript가 필요해요.</noscript><script type="module" src="/js/coach-page.js"></script>
+</body>
+</html>

@@ -90,7 +90,7 @@ function renderForm() {
       h(
         "p",
         { class: "info" },
-        "켜면 영상은 보내지 않고, 이 브라우저가 꺼낸 소리(16kHz 모노, 약 20초 조각)만 우리 서버를 거쳐 외부 AI 음성 인식 서비스(Vercel AI Gateway)로 전송돼요. 켜지 않으면 파일과 소리는 이 브라우저 밖으로 나가지 않고, 긴 침묵 찾기만 해요.",
+        "켜면 영상은 보내지 않고, 이 브라우저가 꺼낸 소리(16kHz 모노, 약 20초 조각)만 직접 운영하는 음성 인식 서버로 전송돼요. 외부 AI 제공자에게는 보내지 않아요. 켜지 않으면 파일과 소리는 이 브라우저 밖으로 나가지 않고, 긴 침묵 찾기만 해요.",
       ),
     ),
     errors,
@@ -163,7 +163,7 @@ async function run(file, input) {
       segments = res.segments
       transcript = analyzeTranscript(segments, total)
       speechState = transcript.status === "ok" ? "ok" : "no-text"
-      notices.push("소리 조각을 외부 음성 인식 서비스로 보내 글자로 바꿨어요.")
+      notices.push("소리 조각을 자체 음성 인식 서버에서 글자로 바꿨어요.")
     } else {
       speechState = "error"
       notices.push(

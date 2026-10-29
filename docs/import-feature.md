@@ -1,78 +1,39 @@
-# 영상·소리 파일 불러오기와 글자 변환 (구현됨)
+# 영상·소리 파일 불러오기와 자체 음성 전사
 
-2026-10-29 학생 요청("mp4를 음성데이터를 빼고 글자변환으로")으로 추가한 기능이다. 추가 사용자 지시로 파일 불러오기·선택 전사·군말 후보 집계를 **F16**, 영상 깜빡임 측정을 **F15**로 배정했다. 기존 F1–F14와 S1–S4는 유지한다. 상세는 [영상·전사 측정 명세](media-measurements.md).
+F16 파일 불러오기·전사·군말 후보와 F15 영상 측정을 제공한다. 사용자 변경 지시에 따라 AI Gateway 중계를 제거하고 직접 운영하는 faster-whisper worker로 전환했다. 외부 AI 키를 읽거나 외부 공급자로 대체하지 않는다.
 
-## 하는 일
+## 흐름
 
-이미 녹음·녹화해 둔 영상 또는 소리 파일(mp4, m4a, mp3, wav, webm)을 `/import.html`에서 고르고 목표 시간을 적으면, 파일에서 **소리만** 브라우저 안에서 꺼내 같은 결과 화면(`#/result/ID`)으로 보여 준다.
+1. `/import.html`에서 파일과 목표 시간을 고른다. 지원 여부는 브라우저의 디코딩에 달려 있으며 300 MB·30분 제한을 적용한다.
+2. 소리를 브라우저에서 16kHz mono로 풀어 긴 침묵을 찾는다. 소리 없는 영상은 영상 재생·분석을 계속할 수 있다.
+3. 사용자가 글자 변환을 켠 경우에만 약 20초(±5초) WAV 조각을 같은 출처 `POST /api/transcribe`로 전송한다.
+4. Node는 `LOCAL_STT_URL`의 loopback `/transcribe`에 PCM WAV를 보내고 텍스트·구간을 받는다. worker는 미리 준비된 모델만 읽는다.
+5. 브라우저가 속도·반복·군말 후보를 계산해 기존 결과 화면에 보여 준다. 파일·결과는 IndexedDB에 보관한다. 군말은 인식 누락·문맥 차이가 있어 실제 오류나 감정으로 단정하지 않는다.
 
-- 항상 하는 분석: 긴 침묵 찾기(기존 기준 그대로), 총 길이와 목표 시간 비교. 결과 화면의 항목을 누르면 영상·소리의 그 위치로 이동한다.
-- 학생이 '글자로도 바꿔서 분석'을 **직접 켠 경우에만**: 소리를 글자로 바꿔 평균 말하기 속도, 반복 표현, 속도 변화와 군말 후보의 종류·횟수를 분석한다. 군말 후보는 전사문에서 로컬 사전 일치로 집계하며 추가 AI 호출은 없다.
-- 지금은 구간별 시간 계획·마디 표시·목표 속도 범위를 쓰지 않는다(파일에는 '다음 구간'을 누른 기록이 없다).
+영상·얼굴은 전송하지 않는다. 글자 변환을 끄면 소리도 브라우저 밖으로 보내지 않는다. 켜면 자체 서버에 소리가 전송되므로 브라우저에서만 처리한다고 안내하지 않는다. Node와 worker는 소리·전사를 파일이나 본문 로그에 남기지 않는다.
 
-## 처리 흐름
+## 서버 규칙
 
-1. 브라우저가 `AudioContext({ sampleRate: 16000 }).decodeAudioData`로 파일의 소리를 16kHz 모노로 푼다(`public/js/importer.js`). 300MB 초과·30분 초과·읽을 수 없는 형식은 이유를 알리고 멈춘다. 소리를 읽지 못해도 영상이 재생 가능하면 소리·전사 분석은 건너뛰고 영상만 보관할 수 있다.
-2. 긴 침묵을 찾는다(`analyzeSilence`).
-3. 글자 변환을 켰다면 가장 조용한 지점(목표 20초 ± 5초)에서 소리를 조각으로 나눠 `POST /api/transcribe`로 보낸다(동시 3개, 조각마다 실패 시 1회 재시도).
-4. 서버(`server.js`)가 `AI_GATEWAY_API_KEY`로 AI Gateway(`POST {AI_GATEWAY_URL}/v4/ai/transcription-model`, 모델 기본값 `google/gemini-3.5-transcribe`)를 호출하고 글과 구간(segments)을 돌려준다.
-5. 돌아온 글을 파일 시간 기준의 글 조각으로 바꿔 기존 분석(`analyzeTranscript`)에 넣고, 결과를 이 브라우저의 IndexedDB에 저장한 뒤 결과 화면으로 이동한다.
-
-## 개인정보와 전송 범위
-
-- 영상 파일은 서버로 보내지 않고 이 브라우저 안에만 저장한다.
-- 글자 변환을 켜지 않으면 파일·소리 모두 브라우저 밖으로 나가지 않는다.
-- 켠 경우에만 16kHz 모노 WAV 조각이 우리 서버를 거쳐 외부 AI 음성 인식 서비스로 전송된다. 켜기 전 화면에 안내하고, 결과 화면에도 보냈다고 적는다. 서버는 받은 소리를 저장하거나 기록하지 않는다.
-- 키는 서버 환경변수로만 읽고 응답·화면·저장소에 나오지 않는다.
-
-## 서버 API: `POST /api/transcribe`
-
-| 상황 | 응답 |
+| 조건 | 응답 |
 | --- | --- |
-| `AI_GATEWAY_API_KEY`가 없음 | 503 `not-configured` (글자 변환만 꺼지고 나머지 기능은 그대로) |
-| 본문이 WAV가 아님 | 415 `not-wav` |
-| 본문이 4MB 초과(약 2분) | 413 `too-large` |
-| 서버가 켜져 있는 동안 변환한 소리 길이 합이 한도 초과(기본 3600초, `TRANSCRIBE_TOTAL_SECONDS`) | 429 `budget` (팀 예산 $10 보호용) |
-| 게이트웨이가 401·403 | 502 `gateway-auth` |
-| 게이트웨이가 429 | 429 `gateway-limit` |
-| 게이트웨이 연결 실패(90초 제한 포함) | 502 `gateway-unreachable` |
-| 그 밖의 게이트웨이 오류 | 502 `gateway-error` |
-| 성공 | 200 `{ text, segments:[{text,startSecond,endSecond}], language, durationInSeconds }` |
+| `LOCAL_STT_URL` 없음·외부 주소 | 503 not-configured |
+| 4 MiB 초과 | 413 too-large |
+| 16kHz mono PCM16 WAV 형식 불일치 | 415 not-wav |
+| 서버 누적 길이 초과(기본 3600초) | 429 budget |
+| 동시 전사 3개 초과 | 429 busy |
+| 자체 worker 오류 | 502 model-error, worker 429는 429 |
+| 연결·90초 제한 실패 | 502 model-unreachable |
+| 응답을 읽을 수 없음 | 502, 원자료 보존 |
+| 성공 | text, segments[{text,startSecond,endSecond}], language, 실제 WAV 길이, processing:self-hosted |
 
-실패한 요청은 한도에서 뺀 소리 길이를 돌려받는다. `GET` 등 다른 방식은 405.
+실패한 요청은 누적 길이를 반환한다. 요청한 음성 길이를 넘는 구간·빠진 시간·뒤집힌 구간은 버린다. 인식 시각은 발화 단어의 정확한 타임스탬프라는 보장이 없다. 브라우저는 부분 실패·취소를 안내하고 로컬 침묵 분석을 유지한다.
 
-## 환경변수
+## 실행·배포
 
-| 이름 | 용도 |
-| --- | --- |
-| `AI_GATEWAY_API_KEY` | AI Gateway 키(비밀값). 없으면 글자 변환만 꺼진다 |
-| `TRANSCRIBE_MODEL` | (선택) 모델. 기본 `google/gemini-3.5-transcribe` |
-| `TRANSCRIBE_TOTAL_SECONDS` | (선택) 서버 누적 변환 길이 한도(초). 기본 3600 |
-| `AI_GATEWAY_URL` | (선택) 게이트웨이 주소. 기본 `https://ai-gateway.vercel.sh`. 테스트에서 가짜 서버를 가리킬 때 쓴다 |
+`LOCAL_STT_URL`, `LOCAL_STT_MODEL_DIR`, `LOCAL_STT_PORT` 설정과 설치 명령은 [자체 AI 실행](../local-ai/README.md). `AI_GATEWAY_API_KEY`·`TRANSCRIBE_MODEL`·`AI_GATEWAY_URL`은 폐기한 설정이다. 키가 있어도 외부 제공자를 부르지 않는다.
 
-`docker-compose.yml`의 `app`이 위 이름을 `${이름:-}` 형태로 받아 넘긴다. 값은 저장소에 두지 않는다.
+기존 Render·Docker 기본 구성에는 모델 worker가 없다. 웹과 health·타이머는 실행되지만 자체 전사를 사용하려면 같은 운영 호스트에 worker·모델을 준비해야 한다. 공개 AI 배포는 미검증이다.
 
-## Render 배포
+## 검증 범위
 
-저장소 루트의 `render.yaml`(Blueprint)이 웹 서비스 하나를 정의한다. 서버 하나가 화면과 `/api/transcribe`를 같이 내보내므로 프론트엔드와 백엔드는 같은 주소로 이미 연결되어 있다(주소 설정·CORS 없음).
-
-1. Render에 가입·로그인하고 GitHub를 연결해 이 저장소(`kara320090/Speech-Coach`)에 접근을 허용한다.
-2. New → Blueprint에서 이 저장소를 고르면 `render.yaml`대로 `speech-coach` 웹 서비스가 만들어진다(Node 22, `node server.js`, 상태 확인 `/__health`).
-3. 서비스의 Environment에서 `AI_GATEWAY_API_KEY`에 팀 키를 직접 넣는다(키는 채팅·저장소에 적지 않는다). 안 넣으면 글자 변환만 꺼진다.
-4. 배포가 끝나면 `https://<서비스 이름>.onrender.com/__health`가 `{"status":"ok","releaseId":"<commit>"}`를 주는지 확인한다. 마이크·웹캠은 HTTPS에서만 허용되는데 Render 주소는 HTTPS다.
-5. 무료 플랜은 한동안 접속이 없으면 서버가 잠들어 첫 접속이 느릴 수 있다. 서버가 다시 켜지면 글자 변환 누적 한도(`TRANSCRIBE_TOTAL_SECONDS`) 계산도 0부터 다시 시작한다.
-
-## 검증과 한계
-
-- 단위 테스트(`node --test`, 전체 40개 중 13개): `tests/transcribe.test.mjs`(가짜 게이트웨이 서버로 키 없음·415·413·성공·오류 구분·연결 실패·한도), `tests/importer.test.mjs`(조각 나누기, 글 조각 변환, 재시도·중단).
-- 브라우저 검사 `e2e/media/import.spec.ts`(`npx playwright test -c media.config.ts`): 메뉴에서 wav를 불러와 3초 부근의 약 5초 긴 침묵을 찾고 눌러서 이동, 글자 변환(가짜 `/api/transcribe` 응답), 키 없음 처리, 켜지 않으면 호출 없음, 잘못된 입력과 읽을 수 없는 파일. 주최 측 시나리오(`docs/scenarios.yaml`)에는 넣지 않았다.
-- ffmpeg로 만든 mp4(H.264+AAC)를 Playwright Chromium에서 불러와 소리를 꺼내고 침묵 위치(0:06~0:11)를 찾는 것을 확인했다. 브라우저가 풀 수 있는 코덱만 가능하다.
-- **실제 AI Gateway는 호출해 보지 못했다**(Agent는 키를 받지 않았다). 요청 모양은 Gateway 문서에 맞췄고 가짜 서버로만 확인했다. 실제 응답에 구간(segments)이 없거나 모양이 다르면 조각 전체(약 20초)를 한 구간으로 보므로 시간 위치가 거칠어진다.
-- **Render 배포는 해 보지 못했다**(가입·저장소 연결·키 입력은 학생이 직접 해야 한다). `render.yaml`은 Render 설정 규칙대로 썼지만 실제 Render에서 돌려 확인한 것은 아니다.
-- 말하기 속도·반복 표현은 전사 품질에 좌우되고, 한글이 아닌 말·숫자·누락에서 한계가 있다(기존 기준과 같다).
-
-## 영상 눈 깜빡임과 군말 후보 추가
-
-불러오기에서 눈 깜빡임 선택을 켜면 영상만 브라우저 안에서 처리한다. 소리만 있는 파일은 이유를 표시하고 소리 분석은 유지한다. 켜지 않고 불러온 영상도 결과의 분석 버튼을 사용할 수 있다. 계산 기준·개인정보·실패·취소·전사 구간 보정은 [F15–F16 명세](media-measurements.md)를 따른다.
-
-초기 40개 검사에서 구간의 null/빈 시각을 거부하는 검사와 JSON 오류 시 누적 초 반환, 군말·깜빡임 순수 함수·고정 자산 검사 등을 더해 Node 22에서 56개 통과했다. 실제 AI Gateway 키는 로컬 환경에 없어 실제 응답 형태는 여전히 미확인이다. 문서상 startSecond/endSecond 및 기존 start/end 호환을 가짜 응답으로 검사했다.
+전사 단위 검사를 기존 Gateway 프로토콜에서 자체 WAV worker 프로토콜로 전환해 형식·한도·오류·성공·누적 반환·구간 검증을 유지했다. 별도 미디어 브라우저 검사는 가짜 전사 응답으로 파일→결과→군말·구간 이동을 확인한다. 실제 worker에서는 준비된 모델 로딩과 합성 무음 처리를 확인했다. 실제 사람 음성의 한국어·군말 정확도는 아직 검증하지 않았다. [진행 기록](../progress.md).

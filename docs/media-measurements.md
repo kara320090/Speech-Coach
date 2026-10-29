@@ -1,5 +1,8 @@
 # 영상 깜빡임·전사 군말 후보 측정 — F15·F16
 
+**현재 구현 상태:** 자체 실행 텍스트 코칭과 음성 전사의 첫 구현이 추가됐다. 아래 전체 기획의 완료 조건과 구현된 부분은 [구현 범위](local-ai-implementation.md)에서 구분한다. 외부 AI Gateway와 브라우저 실시간 음성 인식은 제거/비활성화했다.
+
+
 2026-10-29 사용자 지시로 얼굴 분석의 범위를 변경했다. 감정·긴장·자세·발표 점수는 판정하지 않는다. F15는 영상의 눈 깜빡임 측정, F16은 기존 파일 불러오기·선택 AI 전사에 군말 후보 집계를 연결한 기능이다. F1–F14의 번호·기존 S1–S4는 유지한다.
 
 ## 사용 흐름
@@ -43,7 +46,7 @@
 
 `cleanSegments`와 `chunkSegments`는 문서상 `startSecond/endSecond`, 기존 호환 `start/end`를 받는다. null·빈 문자열·음수·역전 구간을 0초로 오인하지 않고 제외하며 구간을 시간순으로 정리한다. 소비 측에서 파일 조각 범위를 검사·제한한다. 잘못된 JSON 응답은 502로 처리하고 예약한 누적 초를 반환한다.
 
-완료 조건 AC-16: 선택 전송·키 없음·한도·오류 흐름과 기존 결과를 유지한다. 실제 전사 토큰의 후보 종류·횟수·구간 근거를 보여 주고 눌러서 이동한다. 실제 AI Gateway 응답 검증은 키가 있는 환경에서 별도 수행한다.
+완료 조건 AC-16: 선택 자체 전송·worker 없음·한도·오류 흐름과 기존 결과를 유지한다. 실제 전사 토큰의 후보 종류·횟수·구간 근거를 보여 주고 눌러서 이동한다. 자체 worker의 합성 무음 처리는 확인했다. 실제 사람의 군말·전사 구간 정확도는 별도 검증한다.
 
 ## 배포·개인정보·의존성
 
@@ -62,4 +65,7 @@
 - `e2e/media/measurements.spec.ts`: 실제 모델의 빈 프레임 처리, 소리 없는 합성 영상의 미검출, 가짜 모델 계수로 계산→결과→이동→다시 읽기, 모델 실패·취소, 가짜 AI 전사 집계 검증.
 - 합성 영상과 가짜 장치 검사는 **실제 사람 눈 깜빡임 검출 정확도·실제 카메라 성능을 검증하지 않는다.** 기준값은 초기 구현 규칙이며 의료·행동 기준이 아니다. 모델이 없는 얼굴을 검출하지 않는 검사와 실제 얼굴의 깜빡임 정확도는 구분한다.
 
-공식 구현 참고: [MediaPipe 웹 가이드](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js), [Vercel Gateway 전사 구현](https://github.com/vercel/ai/blob/main/packages/gateway/src/gateway-transcription-model.ts). 실제 실행 결과와 미검증 항목은 [progress.md](../progress.md)에 기록한다.
+공식 구현 참고: [MediaPipe 웹 가이드](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js), [faster-whisper](https://github.com/SYSTRAN/faster-whisper). 실제 실행 결과와 미검증 항목은 [progress.md](../progress.md)에 기록한다.
+
+
+현재 자체 실행 방식에서는 기존 Gateway 전사 설명을 사용하지 않는다. 자체 worker·전송 범위·실행 환경은 [파일 불러오기](import-feature.md), 새 텍스트 코칭은 [구현 범위](local-ai-implementation.md)를 따른다. 브라우저 실시간 음성 인식은 비활성화했으며 파일 전사의 군말·속도 계산 규칙은 유지했다.
