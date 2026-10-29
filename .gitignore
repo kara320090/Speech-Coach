@@ -1,0 +1,35 @@
+# 비밀값·환경 파일
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 의존성
+node_modules/
+
+# 빌드 산출물
+.next/
+out/
+dist/
+build/
+coverage/
+
+# E2E 결과
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+
+# 로그·캐시
+*.log
+.cache/
+.turbo/
+.vercel/
+
+# 운영체제·편집기
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 큰 데이터 파일(데이터셋·영상 등)은 커밋하지 않는다. E2E 입력 자료는 e2e/fixtures/에 10MB 이하로 둔다.
