@@ -13,6 +13,7 @@ function remember() {
   catch { say("이 탭에 대화를 보관하지 못했어요. 화면을 닫기 전에 필요한 내용을 복사해 주세요.") }
 }
 function controls() {
+  $("support-answer").disabled = Boolean(pending)
   const allowed = ready && $("share-support").checked && !pending && $("support-script").value.trim().length >= 3
   $("start-support").disabled = !allowed
   $("answer-support").disabled = !allowed || ended || !reply?.question || history.filter(h => h.role === "user").length >= 3
