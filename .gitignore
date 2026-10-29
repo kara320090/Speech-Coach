@@ -42,3 +42,4 @@ e2e/fixtures/fake-speech.wav
 models/
 .venv/
 __pycache__/
+local-ai/runtime.local.json

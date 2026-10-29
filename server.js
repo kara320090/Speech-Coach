@@ -1,12 +1,14 @@
 // Node 22 web server with loopback-only, self-hosted model processing. No external AI provider calls.
 import http from "node:http"
 import fs from "node:fs/promises"
+import { readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createScriptImportHandler } from "./server/script-import.js"
 
 import { createLocalCoach, CoachError, LIMITS } from "./server/local-coach.js"
 import { createLocalTranscriber } from "./server/local-transcribe.js"
+import { createAgentBroker } from "./server/agent-broker.js"
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "public")
 const MIME = {
@@ -49,9 +51,14 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks)
 }
 
-export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits } = {}) {
-  const coach = createLocalCoach({ env, fetchImpl })
-  const transcriber = createLocalTranscriber({ env, fetchImpl })
+export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits, runtime, agentPublicKey } = {}) {
+  const agentMode = env.AI_EXECUTION_MODE === "agent" || env.RENDER === "true"
+  const broker = agentMode ? createAgentBroker(agentPublicKey || JSON.parse(readFileSync(new URL("./server/agent-public-key.json", import.meta.url), "utf8")).publicKey) : null
+  const inferenceEnv = broker ? { ...env, LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
+  const inferenceFetch = broker ? broker.fetch : fetchImpl
+  const coach = createLocalCoach({ env: inferenceEnv, fetchImpl: inferenceFetch })
+  const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
+  const frontendOrigins = new Set(["https://speech-coach-kara320090.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
   const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
 
   async function api(req, res, pathname) {
@@ -61,10 +68,11 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
     try {
       if (pathname === "/api/model-status") {
         if (req.method !== "GET") return sendJson(res, 405, { error: "method" })
-        return sendJson(res, 200, { ...await coach.status(), transcriptionConfigured: transcriber.configured })
+        const managed = runtime?.snapshot() || broker?.snapshot()
+        return sendJson(res, 200, { ...await coach.status(), transcriptionConfigured: transcriber.configured, ...(managed && { runtime: managed }) })
       }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" })
-      if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return sendJson(res, 403, { error: "origin", message: "이 페이지에서 시작한 요청만 처리할 수 있어요." })
+      if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host && !frontendOrigins.has(req.headers.origin)) return sendJson(res, 403, { error: "origin", message: "이 페이지에서 시작한 요청만 처리할 수 있어요." })
       if (pathname === "/api/transcribe") {
         const body = await readBody(req, 4 * 1024 * 1024)
         const result = await transcriber.run(body, controller.signal)
@@ -83,9 +91,13 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
     } finally { res.off("close", abort) }
   }
 
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://localhost")
+      if (url.pathname.startsWith("/api/runtime/")) {
+        if (!broker) return sendJson(res, 404, { error: "not-found" })
+        return await broker.handle(req, res, url.pathname)
+      }
       if (["/api/transcribe", "/api/coach", "/api/model-status"].includes(url.pathname)) return await api(req, res, url.pathname)
       if (url.pathname === "/api/scripts/import") {
         if (req.method !== "POST") {
@@ -116,6 +128,8 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
       res.end()
     }
   })
+  server.once("close", () => broker?.close())
+  return server
 }
 
 function notFound(res) {

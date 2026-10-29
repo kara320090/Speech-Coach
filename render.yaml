@@ -1,5 +1,5 @@
-# Basic web deployment only. Model binaries/weights are not installed by this blueprint.
-# AI features remain unavailable until self-hosted inference is provisioned on the same host.
+# Render serves the web/API and authenticates the self-hosted inference PC.
+# Model files and private signing keys remain on the inference PC.
 services:
   - type: web
     name: speech-coach
@@ -14,3 +14,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: AI_EXECUTION_MODE
+        value: agent

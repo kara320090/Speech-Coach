@@ -1,5 +1,32 @@
 # 자체 AI 실행
 
+## 공개 사이트의 AI 실행
+
+공개 프론트는 Vercel, API는 Render, 모델 계산은 운영 PC에서 수행한다. 브라우저는 같은 사이트의 `/api/*`를 호출하고 Vercel이 Render로 전달한다. 운영 PC의 에이전트는 Render에 HTTPS로 연결해 작업을 받고 로컬 모델로 처리한 결과를 반환한다.
+
+모델 준비 후 저장소 루트에서 한 번 설정한다. 각 경로는 운영 PC의 실제 파일을 지정한다.
+
+```powershell
+npm run ai:configure -- --models C:/speech-coach-models --llama C:/llama/llama-server.exe --python C:/Python/python.exe --gpu-layers 99
+npm run ai:pair
+```
+
+가상환경 Python을 사용하면 그 실행 파일을 지정한다. 별도 폴더에 Python 패키지를 설치했다면 `--python-packages 경로`를 추가한다. CPU만 사용할 때 `--gpu-layers 0`을 쓴다. 모델 파일의 SHA-256을 검증하고 개인 실행 설정 `runtime.local.json`을 저장한다.
+
+`ai:pair`는 에이전트 개인 키를 이 PC에 저장하고 공개 키 `server/agent-public-key.json`을 만든다. 공개 키가 포함된 백엔드를 배포한 뒤 다음 명령으로 실행한다.
+
+```powershell
+npm run start:agent
+```
+
+이 명령은 Qwen·전사 프로세스의 준비를 확인하고 Render에 연결한다. 개인 키·환경 파일·모델은 Git에 넣지 않는다. 각 작업은 시간 제한·취소·크기 제한을 적용하고 메모리에서만 전달하며, 모델 입력·답변·음성을 로그나 서버 DB에 보관하지 않는다. 에이전트 종료 시 모델도 함께 종료한다. 이 PC에서 에이전트를 계속 실행해야 공개 사이트의 AI가 작동한다.
+
+운영 확인은 공개 사이트의 `/api/model-status`에서 `ready: true`, `runtime.mode: self-hosted-agent`, `runtime.transcriptionReady: true`로 한다. 로컬에서 화면까지 함께 개발할 때만 `npm start`를 사용한다. 기존 Docker 기본 웹은 `node server.js`로 실행하며 별도 모델 에이전트를 자동 설치하지 않는다.
+
+## 모델 프로세스 관리
+
+백엔드 실행기는 모델을 loopback에만 바인딩하고 외부 모델 다운로드 없이 시작한다. 준비 확인, 제한된 자동 재시작, 종료 처리를 제공한다. 로컬 개발의 `npm start`는 준비된 모델과 웹을 함께 띄우며, `npm run start:web`는 기본 웹만 실행한다.
+
 외부 AI API 키와 추가 학습을 사용하지 않는다. 모델 다운로드는 최초 준비 단계에서만 수행한다. 서비스 시작 시 자동 다운로드·외부 폴백은 없다. 사용자에게 앱을 설치하게 하는 제품이 아니라 개발자/운영자가 웹 서버와 모델을 준비하는 방법이다.
 
 ## 1. 모델과 실행기 준비

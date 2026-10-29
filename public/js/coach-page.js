@@ -179,3 +179,6 @@ const loaded = await loadWorkspace()
 if (loaded?.id === "current" && Array.isArray(loaded.versions) && Array.isArray(loaded.attempts)) state = { ...fresh(), ...loaded }
 $("script").value = state.script; $("sources").value = state.sources; $("question-text").textContent = state.question
 renderHistory(); await refreshModel()
+// Reflect a managed model restarting without requiring a page reload.
+setInterval(() => { if (!document.hidden && !controller) refreshModel() }, 10000)
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !controller) refreshModel() })

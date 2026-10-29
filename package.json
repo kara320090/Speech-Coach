@@ -5,7 +5,11 @@
   "type": "module",
   "description": "발표 연습 코치: 연습 중 시간·속도 안내와 연습 후 검토 구간 표시",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --env-file-if-exists=.env local-ai/start.mjs",
+    "start:web": "node server.js",
+    "ai:configure": "node local-ai/configure.mjs",
+    "ai:pair": "node local-ai/pair-agent.mjs",
+    "start:agent": "node --env-file-if-exists=.env local-ai/agent.mjs",
     "test": "node --test"
   },
   "engines": {
