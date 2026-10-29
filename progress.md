@@ -117,4 +117,4 @@
 - 확인: 시작 시 기존 단위 40개 통과. 추가 후 Node 22.23.4 단위 56개 통과. 기존 S1–S4 브라우저 4개 통과. 신규 measurements.spec.ts 5개 통과(실제 모델 로딩·빈 영상 처리·합성 계수·가짜 전사).
 - 미확인: 실제 사람 얼굴과 카메라의 깜빡임 정확도, 다양한 브라우저·조명·안경·얼굴 각도, 실제 AI Gateway 응답·비용, Render 공개 배포. 프로세스·사용자·시스템 환경에 AI_GATEWAY_API_KEY가 없어 실제 호출은 하지 않았다. 값은 조회·출력하지 않았다.
 - 별도 미디어 회귀 검사 `e2e/media.config.ts`: 기존 13개와 신규 5개를 합해 **18개 모두 통과**(Chromium 가짜 장치, 1.8분). 기존 소리/웹캠·일시정지·기록 비교·키 없음·선택 전송도 확인했다. 실제 사람 정확도 검사는 아니다.
-- PR 브랜치 CI는 제출 후 확인한다. 기존 workflow는 main push만 자동 실행하므로 브랜치에서 workflow_dispatch로 별도 검사하며 main 자동 배포를 유발하지 않는다.
+- [PR #3](https://github.com/kara320090/Speech-Coach/pull/3)으로 제출했다. 코드 commit `4e6225e`의 [브랜치 CI](https://github.com/kara320090/Speech-Coach/actions/runs/40882093930)에서 Docker 기동·health·S1–S4 4개가 모두 통과했다. 기존 workflow는 main push만 자동 실행하므로 브랜치에서 workflow_dispatch로 검사했다. 이 결과를 기록하는 후속 commit은 문서만 변경하며, main push·병합·Render 배포는 수행하지 않았다.
