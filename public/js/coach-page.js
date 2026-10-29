@@ -10,6 +10,7 @@ function h(tag, text, cls) { const e = document.createElement(tag); if (text != 
 function button(text, action) { const e = h("button", text); e.type = "button"; e.addEventListener("click", action); return e }
 function status(text) { $("request-state").textContent = text }
 function controls() {
+  $("answer").disabled = Boolean(controller) || reviewSaving
   document.querySelectorAll("[data-ai]").forEach(e => { e.disabled = !ready || Boolean(controller) || reviewSaving })
   document.querySelectorAll("[data-review]").forEach(e => { e.disabled = Boolean(controller) || reviewSaving })
   $("cancel").hidden = !controller
