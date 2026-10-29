@@ -1016,6 +1016,7 @@ function renderResults() {
       { class: "btn-row" },
       h("button", { type: "button", class: "btn btn-primary", id: "btn-again", onclick: againSameCondition }, "같은 조건으로 다시 연습"),
       h("a", { href: "#/history" }, "연습 기록 보기"),
+      session.audioBlob && h("a", { href: `/studio.html?session=${encodeURIComponent(session.id)}` }, "스튜디오에서 음성 인식 확인"),
     ),
   )
   fillCompare(session, compareHost)
