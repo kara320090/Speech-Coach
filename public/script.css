@@ -1,0 +1,5 @@
+/* 대본 패널 '대본 편집' 모드의 TXT 불러오기 영역. 입력·안내·오류 모양은 styles.css의 공통 규칙을 따른다. */
+.script-import { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
+.script-import .hint, .script-import .errors, .script-import .notice { margin: 0; }
+.script-import .notice p { margin: 0 0 var(--space-2); }
+.script-import input[type="file"] { max-width: 100%; }

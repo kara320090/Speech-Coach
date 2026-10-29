@@ -1,5 +1,9 @@
 # 요구사항 추적표
 
+## 2026-10-30 main 통합 상태
+
+main의 다시봄 화면, TXT 불러오기, 구간 질문·조건 선택·재연습(S9), E2와 공개 조사 기록을 보존했다. 자체 AI 대본 코칭과 선택 전사, 영상 눈 깜빡임을 함께 제공한다. main의 F15는 대본 이해 교차 확인으로 유지하고, PR #3의 눈 깜빡임은 F21로 변경했다. 기존 문서의 미구현 표시는 당시 기록이며, 현재 상태는 이 절과 구현 범위 문서를 따른다. F13–F14 기본 흐름은 구현됐지만 전체 계획 수용 조건이 검증됐다는 뜻은 아니다.
+
 **현재 구현 상태:** 자체 실행 텍스트 코칭과 음성 전사의 첫 구현이 추가됐다. 아래 전체 기획의 완료 조건과 구현된 부분은 [구현 범위](local-ai-implementation.md)에서 구분한다. 외부 AI Gateway와 브라우저 실시간 음성 인식은 제거/비활성화했다.
 
 
@@ -13,7 +17,7 @@
 | F4 | B1 | FR-04 | AC-04 | UI-02·UI-03 | 장치 검증 | T04 | R0 / 코드 존재·실사용 검증 필요 |
 | F5 | B1 | FR-05 | AC-05 | UI-03 | 구간 재생 검증 | T05 | R0 / 코드 존재·실사용 검증 필요 |
 | F6 | B3 | FR-06 | AC-06 | UI-03·UI-04 | S4 | T06 | R0 / 코드 존재·실사용 검증 필요 |
-| F7 | B3 | FR-07 | AC-07 | UI-05 | S5 | T07 | R1 / 계획·미구현 |
+| F7 | B3 | FR-07 | AC-07 | 대본 패널 ‘대본 편집’(TXT 불러오기), UI-05 | S5 | T07 | R1 / 대본 TXT·붙여넣기 입력·파일명 기록·재연습 연결 구현(`tests/script.test.mjs`, `e2e/media/script.spec.ts`), 필수 항목·버전·수정안 미구현 |
 | F8 | B2 | FR-08 | AC-08 | UI-05·UI-03 | S5 | T08 | R1 / 계획·미구현 |
 | F9 | B2·B3 | FR-09 | AC-09 | UI-06 | S6·S7 | T09 | R3 / 계획·미구현 |
 | F10 | B3 | FR-10 | AC-10 | UI-06 | S6·S7 | T10 | R3 / 계획·미구현 |
@@ -21,7 +25,9 @@
 | F12 | B3 | FR-12 | AC-12 | UI-08 | S8 | T12 | R3 / 계획·미구현 |
 | F13 | B6 | FR-13 | AC-13 | UI-09 | S9 | T13 | R1 / 계획·미구현 |
 | F14 | B6 | FR-14 | AC-14 | UI-10·07 | S10 | T14 | R2 / 계획·미구현 |
-| F15 | B1 | FR-15 | AC-15 | `/import.html`·UI-03 | 별도 미디어 흐름 | T15 | 구현 / 실제 얼굴 정확도 미검증 |
+| F15 | B7 | FR-15 | AC-15 | UI-11·06·07 | S11 | T15 | R1(이해 확인)·R3(다듬기·교차검증) / 계획·미구현 |
+
+| F21 | B1 | FR-21 | AC-21 | `/import.html`·UI-03 | 별도 미디어 흐름 | T21 | 구현 / 실제 얼굴 정확도 미검증 |
 | F16 | B1 | FR-16 | AC-16 | `/import.html`·UI-03 | 별도 미디어 흐름 | T16 | 구현 / 실제 Gateway 미검증 |
 
 코칭 흐름 세부 연결: 화면 상태는 [화면 명세 2.1](screen-spec.md), 검증 사례 C1–C14는 [검증 계획 4.1](validation-plan.md)에서 T11–T14에 연결된다. 기록 구분(observation·userReport·hypothesis·trialOutcome)과 저장·전송 규칙은 [요구사항 분석 4.6–4.7](requirements-analysis.md).
@@ -36,12 +42,12 @@
 | [경쟁 분석](competitive-analysis.md) | 직접 확인·공식 설명·미확인·증거·차별화 결정 |
 | [요구사항 정의](requirements-definition.md) | B/FR/AC/NFR, 입력·출력·예외·수용 기준 |
 | [요구사항 분석](requirements-analysis.md) | 구조·데이터·API·판정 규칙·오류·구현 차이 |
-| [화면 명세](screen-spec.md) / [실제 흐름](scenarios.yaml) | 현재 화면·S1–S4와 계획 화면·S5–S10 |
-| [검증 계획](validation-plan.md) | T01–T14·사용자 검증·실행 증거·미검증 |
+| [화면 명세](screen-spec.md) / [실제 흐름](scenarios.yaml) | 현재 화면·S1–S4와 계획 화면·S5–S11 |
+| [검증 계획](validation-plan.md) | T01–T15·사용자 검증·실행 증거·미검증 |
 | [결정 기록](decisions.md) | 사용자 지시·근거 상태·기존 기록 보존·미확인 |
 | [진행 기록](../progress.md) / [README](../README.md) | 현재 구현·실행 방법·검사·남은 일 |
 
-F15–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measurements.md), T15–T16은 [검증 계획](validation-plan.md)에 연결한다. 주최 측 YAML·e2e/scenarios에는 새 흐름을 추가하지 않는다.
+F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measurements.md), T21–T16은 [검증 계획](validation-plan.md)에 연결한다. 주최 측 YAML·e2e/scenarios에는 새 흐름을 추가하지 않는다.
 
 
 ## 새 문제·초기 구현 연결

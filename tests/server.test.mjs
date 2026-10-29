@@ -25,11 +25,24 @@ test("첫 화면과 스크립트를 준다", async () => {
   await withServer(async (base) => {
     const html = await fetch(`${base}/`)
     assert.equal(html.status, 200)
-    assert.match(await html.text(), /발표 연습 코치/)
+    assert.match(await html.text(), /다시봄/)
     const js = await fetch(`${base}/js/app.js`)
     assert.equal(js.status, 200)
     assert.match(js.headers.get("content-type"), /javascript/)
     assert.match(html.headers.get("permissions-policy"), /microphone=\(self\)/)
+  })
+})
+
+test("시선 추적 파일(WebAssembly·모델)을 우리 서버에서 알맞은 형식으로 준다", async () => {
+  await withServer(async (base) => {
+    const wasm = await fetch(`${base}/vendor/mediapipe/wasm/vision_wasm_internal.wasm`, { method: "HEAD" })
+    assert.equal(wasm.status, 200)
+    assert.equal(wasm.headers.get("content-type"), "application/wasm")
+    const mjs = await fetch(`${base}/vendor/mediapipe/vision_bundle.mjs`, { method: "HEAD" })
+    assert.match(mjs.headers.get("content-type"), /javascript/)
+    assert.equal((await fetch(`${base}/vendor/mediapipe/face_landmarker.task`, { method: "HEAD" })).status, 200)
+    assert.match(wasm.headers.get("content-security-policy"), /script-src 'self' 'wasm-unsafe-eval'/)
+    assert.doesNotMatch(wasm.headers.get("content-security-policy"), /https?:/) // 외부 주소를 열지 않는다
   })
 })
 

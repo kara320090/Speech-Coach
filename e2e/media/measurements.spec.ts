@@ -4,6 +4,7 @@ import { makeWav } from "../fixtures/make-wav"
 
 const blankVideo = path.join(__dirname, "../fixtures/blank-30s.webm")
 async function importVideo(page: Page, analyze = false) {
+  await page.addInitScript(() => localStorage.setItem("dasibom.onboarded", "1"))
   await page.goto("/import.html")
   await page.locator("#f-file").setInputFiles(blankVideo)
   await page.getByLabel("목표 시간 초").fill("30")
@@ -82,6 +83,7 @@ test("model loading failure and cancellation preserve the existing result", asyn
 test("AI transcript candidates are counted locally with seekable evidence; audio has no face metric", async ({ page }) => {
   let posts = 0
   await page.route("**/api/transcribe", (route) => { posts++; return route.fulfill({ contentType: "application/json", body: JSON.stringify({ text: "음 어 음악 음", segments: [{ text: "음 어 음악 음", startSecond: 2, endSecond: 4 }] }) }) })
+  await page.addInitScript(() => localStorage.setItem("dasibom.onboarded", "1"))
   await page.goto("/import.html")
   await page.locator("#f-file").setInputFiles({ name: "synthetic.wav", mimeType: "audio/wav", buffer: makeWav([[10, true]]) })
   await page.getByLabel("목표 시간 초").fill("10")

@@ -1,6 +1,6 @@
 // 영상·소리 파일 불러오기 화면. 파일에서 소리만 꺼내 긴 침묵을 찾고, 원하면 글자로도 바꿔 연습 결과 화면(#/result/ID)으로 넘긴다.
 import { TARGET_RATE, encodeWav } from "./wav.js"
-import { analyzeSilence, analyzeTranscript, buildReviewItems, classifyResult, conditionKey } from "./analysis.js"
+import { analyzeFillers, analyzeSilence, analyzeTranscript, buildReviewItems, classifyResult, conditionKey } from "./analysis.js"
 import { decodeToMono16k, planChunks, transcribeChunks, MAX_FILE_BYTES } from "./importer.js"
 import { saveSession } from "./storage.js"
 import { analyzeVideoBlinks, readVideoDuration } from "./video-analysis.js"
@@ -96,7 +96,7 @@ function renderForm() {
     errors,
     h("div", { class: "check" }, h("input", { id: "f-blink", type: "checkbox" }), h("label", { for: "f-blink" }, "영상 눈 깜빡임도 이 기기에서 분석 (선택)")),
     h("p", { class: "hint" }, "눈 깜빡임은 영상 파일만 분석해요. 영상·얼굴은 전송하지 않으며, 군말 후보 집계는 위 글자 변환을 켠 경우에만 가능해요."),
-    h("button", { type: "submit", class: "primary" }, "분석 시작"),
+    h("button", { type: "submit", class: "btn btn-primary" }, "분석 시작"),
   )
   form.addEventListener("submit", (ev) => {
     ev.preventDefault()
@@ -182,7 +182,8 @@ async function run(file, input) {
     blink = await analyzeVideoBlinks(isVideo ? file : null, { signal: controller.signal, onProgress: (at, all, message) => { status.textContent = `${message} ${Math.floor(at / all * 100)}%` } })
     cancel.remove()
   }
-  const items = buildReviewItems({ silence, transcript, blink, sectionRows: [], toleranceSec: input.tol })
+  const fillers = speechState === "ok" ? analyzeFillers(segments) : null
+  const items = buildReviewItems({ silence, transcript, blink, sectionRows: [], toleranceSec: input.tol, fillers })
   const result = classifyResult(total, input.targetSec, input.tol)
   const settings = {
     targetSec: input.targetSec, toleranceSec: input.tol, warnSec: 0, speedMin: null, speedMax: null,
@@ -200,7 +201,7 @@ async function run(file, input) {
     marks: [],
     sectionRows: [],
     media: { audio: samples.length ? "ok" : "off", video: isVideo ? "ok" : "off", speech: speechState, speechDetail: "" },
-    analysis: { silence: { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio }, transcript, blink, items },
+    analysis: { silence: { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio }, transcript, blink, fillers: fillers && { count: fillers.count, times: fillers.times }, gaze: { status: "off" }, items },
     transcript: segments,
     audioBlob: samples.length ? encodeWav(samples, TARGET_RATE) : null,
     videoBlob: isVideo ? file : null,

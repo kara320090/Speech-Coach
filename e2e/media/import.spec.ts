@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import { makeWav } from "../fixtures/make-wav"
+import { openMain } from "../fixtures/flow"
 
 const wav10 = () => makeWav([[3, true], [5, false], [2, true]])
 
@@ -13,7 +14,7 @@ async function openImport(page: Page, { text = false, seconds = "10" } = {}) {
 
 test.describe("영상·소리 파일 불러오기", () => {
   test("메뉴에서 소리 파일을 불러와 긴 침묵 구간을 확인하고 눌러서 그 위치로 이동한다", async ({ page }) => {
-    await page.goto("/")
+    await openMain(page)
     // 1. 첫 화면의 '영상 불러오기'를 누른다
     await page.getByRole("link", { name: "영상 불러오기" }).click()
     await expect(page.getByRole("heading", { name: "영상·소리 파일 불러오기" })).toBeVisible()

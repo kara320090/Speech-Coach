@@ -13,6 +13,7 @@ const MIME = {
   ".js": "text/javascript; charset=utf-8",
   ".mjs": "text/javascript; charset=utf-8",
   ".wasm": "application/wasm",
+  ".task": "application/octet-stream",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
@@ -22,7 +23,7 @@ const MIME = {
 const HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
-  // 마이크·카메라는 이 사이트에서만 쓴다.
+  // 마이크·카메라는 이 사이트에서만 쓴다. 'wasm-unsafe-eval'은 시선 추적(자체 포함한 MediaPipe WebAssembly)에 필요하다.
   "Permissions-Policy": "microphone=(self), camera=(self)",
   // 고정한 같은 출처 MediaPipe WASM 컴파일만 허용. JS unsafe-eval/외부 CDN/외부 전송은 열지 않는다.
   "Content-Security-Policy":
