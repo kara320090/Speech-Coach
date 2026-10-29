@@ -18,6 +18,9 @@
 | F12 | B3 | FR-12 | AC-12 | UI-08 | S8 | T12 | R3 / 계획·미구현 |
 | F13 | B6 | FR-13 | AC-13 | UI-09 | S9 | T13 | R1 / 계획·미구현 |
 | F14 | B6 | FR-14 | AC-14 | UI-10·07 | S10 | T14 | R2 / 계획·미구현 |
+| (번호 미배정) 영상 불러오기·선택 글자 변환 | B1 | — | — | `/import.html` → UI-03 | (scenarios.yaml 미포함) | 단위·`e2e/media/import.spec.ts` | 코드 존재 / 실제 AI Gateway·배포 미검증, 번호 결정 대기 |
+
+코칭 흐름 세부 연결: 화면 상태는 [화면 명세 2.1](screen-spec.md), 검증 사례 C1–C14는 [검증 계획 4.1](validation-plan.md)에서 T11–T14에 연결된다. 기록 구분(observation·userReport·hypothesis·trialOutcome)과 저장·전송 규칙은 [요구사항 분석 4.6–4.7](requirements-analysis.md).
 
 ## 문서별 책임
 
