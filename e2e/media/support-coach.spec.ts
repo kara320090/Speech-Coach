@@ -97,12 +97,12 @@ test("changed input cancels stale replies; provider failure leaves text editable
   await expect(page.locator("#support-state")).toContainText("잠시 응답하지")
   await expect(page.getByLabel("함께 볼 대본", { exact: true })).toHaveValue("자료가 바뀐 새 대본입니다.")
   expect(calls.length).toBeGreaterThan(0)
-  await expect(page.getByRole("link", { name: "자체 AI로 개념·질문 연습" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "개념·질문 연습" })).toBeVisible()
 })
 
 test("without a key no conversation is sent and base practice remains available", async ({ page }) => {
   await page.goto("/support-coach.html")
   await expect(page.locator("#support-model")).toContainText("키가 준비되지")
   await expect(page.getByRole("button", { name: "동의하고 함께 살펴보기" })).toBeDisabled()
-  await expect(page.getByRole("link", { name: "자체 AI로 개념·질문 연습" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "개념·질문 연습" })).toBeVisible()
 })

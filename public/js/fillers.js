@@ -21,7 +21,7 @@ export function analyzeFillers(segments, durationSec) {
     if (local.size) {
       const counts = [...local].map(([word, count]) => `“${word}” ${count}회`).join(", ")
       items.push({ type: "filler", title: "군말 후보가 포함된 구간", startSec: s.startSec, endSec: Math.min(durationSec, s.endSec),
-        measured: counts, basis: `인식된 글의 독립 토큰과 사전 일치로 집계했어요. 위치는 해당 전사 구간 전체이며 단어의 정확한 시각이 아니에요. 필요한 표현인지 재생해서 확인해 주세요.` })
+        measured: counts, basis: `인식된 글의 독립 토큰과 사전 일치로 집계했어요. ${s.timingPrecision === "chunk" ? "위치는 소리 조각 전체의 추정 범위이며 모델이 인식한 발화 시각이 아니에요." : "위치는 해당 전사 구간 전체이며 단어의 정확한 시각이 아니에요."} 필요한 표현인지 재생해서 확인해 주세요.` })
     }
   }
   const types = [...byType].map(([word, count]) => ({ word, count })).sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
