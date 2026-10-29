@@ -1,6 +1,8 @@
 # 구간 기반 AI 코칭 API (`POST /api/coach/segment`)
 
-기준일: 2026-10-30. 프롬프트 버전 `segment-coach-v1`. **화면 연결: `/support-coach.html`(결과의 검토 구간 → 대본 위치 확인 → 자체 AI 대화 → 문단 수정)** — [통합 화면 설명](supportive-coach.md#통합-화면2026-10-30-자체-ai-구간-대화와-한-화면).
+기준일: 2026-10-30. 프롬프트 버전 `segment-coach-v1`. 2026-10-30부터 `/studio.html`(다시봄 스튜디오)의 4단계 ‘AI 코칭’에 연결했다(`public/js/studio-page.js`).
+
+기존 `/support-coach.html`의 연결도 유지한다. [기존 통합 화면 설명](supportive-coach.md#통합-화면2026-10-30-자체-ai-구간-대화와-한-화면).
 
 사용자가 확인한 대본 위치와 영상 검토 구간(침묵·반복 등 관찰값)으로 “이 부분에서 어떤 일이 있었나요?”라고 묻고, 답에 따라 개념 풀이·이해 확인·다음 연습 행동으로 잇는다.
 
@@ -173,3 +175,7 @@
 - `server/segment-coach.js`: 입력 검사(선택 문장 일관성은 `server/script-align.js`의 `splitScript` 재사용), 흐름 규칙, 기존 코칭 서비스 호출, 요약. 표현 후보·질문 상한은 화면 규칙(`public/js/coach.js`의 `keywordsOf`·`QUESTION_LIMIT`)을 읽기만 한다.
 - `server.js`: 라우트 연결·이 경로의 본문 한도만 추가.
 - `tests/segment-coach.test.mjs`: 실제 HTTP로 `/api/scripts/align` → `/api/coach/segment` 흐름을 검사(가짜 자체 모델 응답) 16개.
+
+### 사용자가 직접 고른 시점
+
+`point.observations[].type: "manual"`은 사용자가 직접 고른 검토 위치다. 자동 감지된 이상이나 측정값으로 단정하지 않으며 요약의 `source`는 `user-selected`로 반환한다. 이 사유만으로 수정 필요나 이해 부족을 추정하지 않는다.
