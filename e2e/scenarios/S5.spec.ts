@@ -1,0 +1,30 @@
+import { expect, test } from "@playwright/test"
+import { openMain } from "../fixtures/flow"
+
+test("S5 학생이 시연용 예시로 상황 질문·수정 허락·대본 적용과 원문 복원을 체험한다", async ({ page }) => {
+  const calls: string[] = []
+  page.on("request", request => { if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/")) calls.push(request.url()) })
+  await openMain(page)
+  await page.getByRole("link", { name: "시연용 예시 체험", exact: true }).click()
+  await expect(page.getByText("시연용 예시 · AI 호출 없음", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "예시 분석 보기", exact: true }).click()
+  await expect(page.getByText("0:18–0:22 · 멈춤 후보 4.2초", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "이 구간 함께 살펴보기", exact: true }).click()
+  await page.getByRole("button", { name: "이 대본 부분이 맞아요", exact: true }).click()
+  await page.getByRole("button", { name: "표현의 뜻을 함께 정리하고 싶어요", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "대본을 쉬운 단어로 풀어 봐도 될까요?", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "예시 대본에 적용", exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "네, 쉬운 대본 예시를 볼게요", exact: true }).click()
+  const apply = page.getByRole("button", { name: "예시 대본에 적용", exact: true })
+  await expect(apply).toBeDisabled()
+  await page.getByRole("checkbox", { name: "5분이라는 수치와 원래 뜻을 확인했어요", exact: true }).check()
+  await apply.click()
+  await expect(page.getByRole("article", { name: "현재 예시 대본", exact: true })).toContainText("같은 요청이 오면, 저장한 결과를 다시 씁니다.")
+  await expect(page.getByText("보관한 예시 버전 2개 · 원문 보존", { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole("article", { name: "현재 예시 대본", exact: true })).toContainText("5분")
+  await page.getByRole("button", { name: "예시 원문으로 되돌리기", exact: true }).click()
+  await expect(page.getByRole("article", { name: "현재 예시 대본", exact: true })).toContainText("동일한 요청이 발생하면 재사용하는 저장소입니다.")
+  await expect(page.getByText("보관한 예시 버전 3개 · 원문 보존", { exact: true })).toBeVisible()
+  expect(calls).toEqual([])
+})

@@ -2,9 +2,9 @@
 
 ## 모델 가중치와 평가 실행
 
-실제 Qwen3-4B·faster-whisper-base 가중치는 [GitHub Release](https://github.com/kara320090/Speech-Coach/releases/tag/model-weights-v1)에 라이선스·분할 순서·해시와 함께 배포한다. 평가용 `docker compose up --build`는 모델을 포함한 이미지에서 Node·텍스트 모델·전사 모델을 함께 시작하며 운영 PC·GPU·외부 AI 키를 요구하지 않는다. 처음 이미지 빌드에는 고정 공개 가중치 다운로드가 필요하다. [복원·CPU Docker 안내](docs/model-distribution.md).
+실제 Qwen3-4B·faster-whisper-base 가중치는 [GitHub Release](https://github.com/kara320090/Speech-Coach/releases/tag/model-weights-v1)에 라이선스·분할 순서·해시와 함께 배포한다. 기본 평가용 `docker compose up --build`는 모델 다운로드 없는 Node 웹 서버를 시작한다. 기본 AI 공급자는 Gateway이며 키가 없으면 AI 미설정 상태를 안내한다. 자체 CPU 모델을 포함한 별도 실행은 `Dockerfile.selfhosted`와 [복원·CPU Docker 안내](docs/model-distribution.md)를 따른다.
 
-제출 흐름은 시간·구간·전후 비교·TXT 대본·자체 AI 이해/수정·파일 전사를 포함한 **8개**이며 각 ID의 E2E 파일과 연결한다. Gemini 새 대본 생성은 키가 필요한 선택 기능으로 핵심 검사를 대신하지 않는다.
+제출 흐름은 시간·구간·전후 비교·재연습과 표시된 예시 체험을 포함한 **6개(S1–S5·S9)**이며 각 ID의 E2E 파일과 연결한다. **[시연용 예시 체험](public/demo.html)**은 키·장치 없이 상황 선택 → 도움말 → 수정 허락 → 대본 확인·적용 → 원문 복원을 제공한다. 준비된 예시임을 계속 표시하며 AI를 호출하지 않는다. 실제 AI 이해·수정·전사 검사는 `e2e/selfhosted`에서 분리한다. [예시 화면 안내](docs/demo-mode.md).
 
 ## 공개 웹과 자체 AI 연결
 
@@ -32,6 +32,7 @@ AI로 만든 대본의 낯선 표현을 풀어 보고, 자기 설명과 예상 �
 
 | 범위 | 상태 |
 | --- | --- |
+| `/demo.html` 시연용 예시 | AI 호출 없는 인터랙티브 목업. 미리 작성한 관찰·상황별 도움·허락 후 수정 예시·확인/적용·버전 저장/복원, 실제 연습과 별도 저장. 제출 S5 |
 | `/coach.html` 대본 이해 연습 | 자료·버전 저장, 개념/풀이, 자기 설명·질의응답, 쉬운 대본 제안·직접 수정·되돌리기, 답변 비교·JSON 내보내기 구현 |
 | 상황을 먼저 묻는 도움 대화 | 결과 → `/support-coach.html` → Gemini 3.8 Flash. 열린 질문·상황별 도움·수정 의사 확인·허락 후 생성·의미 확인 후 다음 연습 적용·원문 보존. [F23 명세](docs/supportive-coach.md) |
 | 새 대본 생성 | `/create-script.html` → Gemini 3.8 Flash. 주제·근거만 전송, 사용자 확인 후 새 버전 저장. 생성 서비스와 코칭의 상태·실패 분리 |
@@ -56,7 +57,7 @@ Node 22.13 이상이 필요하다. 문서 추출용 패키지는 `npm ci --omit=
 npm start
 ```
 
-`http://localhost:3000`에서 기존 연습, `/coach.html`에서 자료 저장·직접 편집을 사용할 수 있다. `npm start`로 실행한 경우 AI는 별도 모델 프로세스가 필요하며 모델이 없으면 상태를 안내한다. **모델 설치·시작 명령은 [자체 AI 실행 안내](local-ai/README.md)**. 큰 모델 파일은 Git 커밋 대신 GitHub Release에 포함하고, 평가용 Docker는 같은 가중치와 실행기를 이미지에 준비한다.
+`http://localhost:3000`에서 기존 연습, `/coach.html`에서 자료 저장·직접 편집, `/demo.html`에서 AI 연결 없는 예시 체험을 사용할 수 있다. `npm start`의 기본 local 공급자는 별도 모델 프로세스가 필요하며 모델이 없으면 상태를 안내한다. **모델 설치·시작 명령은 [자체 AI 실행 안내](local-ai/README.md)**. 큰 모델 파일은 Git 커밋 대신 GitHub Release에 포함한다. 기본 평가 Docker와 모델 포함 `Dockerfile.selfhosted`는 실행 범위를 구분한다.
 
 | 환경변수 | 용도 |
 | --- | --- |
@@ -81,9 +82,9 @@ npm start
 
 ## 검사와 배포 범위
 
-`node --test --test-concurrency=1`: **209개 통과**. 제출 흐름은 S1–S7·S9 **8개**이며, 메인 전사·기존 녹화·파일·대본 코칭 별도 미디어 검사도 **35항목 확인**했다. 생성 서비스와 코칭의 독립성은 가짜 응답·실제 서명된 에이전트 전송으로 검사했다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다. [진행 기록](progress.md).
+현재 `node --test --test-concurrency=1`: **238개 통과**. 키 없이 실행한 제출 E2E S1–S5·S9 **6개 통과**. S5는 준비된 예시 화면의 선택·허락·수정·저장·복원을 확인하며 실제 추론 검사가 아니다. 과거 실제 모델·미디어 확인 범위는 [진행 기록](progress.md)에 별도로 기록한다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다.
 
-`docker compose up --build`는 자체 CPU 모델과 웹을 함께 제공하며, 공개 Render는 서명된 운영 PC 에이전트로 코칭·전사를 처리한다. PC의 `npm run start:agent`와 모델이 실행 중이어야 자체 AI를 사용할 수 있다. 새 대본 생성은 서버 환경의 Gemini 키를 별도로 사용하며, 생성 서비스가 준비되지 않아도 기존 대본으로 연습할 수 있다. 검사는 [진행 기록](progress.md)에서 현재 확인 범위를 구분한다.
+기본 `docker compose up --build`는 웹과 Gateway 설정을 제공한다. 키가 없어도 기본 연습과 예시 체험은 가능하며 AI 상태는 별도로 안내한다. 공개 Render의 자체 AI 경로는 서명된 운영 PC 에이전트로 코칭·전사를 처리하므로 PC의 `npm run start:agent`와 모델이 실행 중이어야 한다. 새 대본 생성은 별도 Gemini 설정을 사용한다. 검사는 [진행 기록](progress.md)에서 현재 확인 범위를 구분한다.
 
 ## 기획·정의·분석 문서
 

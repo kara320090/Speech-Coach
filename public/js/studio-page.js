@@ -568,6 +568,7 @@ function appHeader() {
     h("div", { class: "header-context" }, h("span", { class: "header-context__dot" }), h("span", { text: STAGES.find((s) => s.id === state.stage).label })),
     h("nav", { class: "header-nav", "aria-label": "주 메뉴" },
       h("a", { href: "/", text: "기본 연습 화면" }),
+      h("a", { href: "/demo.html", text: "시연용 예시 체험" }),
       h("a", { href: "/#/history", text: "연습 기록" }),
       state.applied && h("button", { disabled: rec.running || state.analysis.running, onclick: restoreRevision, text: "수정 전 대본으로 되돌리기" }),
       h("button", { onclick: () => { state.onboarding = true; render() }, disabled: rec.running, text: "사용 방법" }),
