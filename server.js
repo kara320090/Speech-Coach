@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createScriptImportHandler } from "./server/script-import.js"
+import { createScriptAlignHandler } from "./server/script-align.js"
 
 import { CoachError, LIMITS } from "./server/local-coach.js"
 import { createCoach, createScriptGenerator } from "./server/coach-provider.js"
@@ -67,6 +68,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
   const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const frontendOrigins = new Set(["https://speech-coach-public.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
   const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
+  const alignScript = createScriptAlignHandler({ sendJson })
 
   async function api(req, res, pathname) {
     const controller = new AbortController()
@@ -112,6 +114,13 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         return await broker.handle(req, res, url.pathname)
       }
       if (["/api/transcribe", "/api/coach", "/api/model-status", "/api/scripts/generate", "/api/scripts/generation-status"].includes(url.pathname)) return await api(req, res, url.pathname)
+      if (url.pathname === "/api/scripts/align") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { Allow: "POST", ...HEADERS })
+          return res.end()
+        }
+        return await alignScript(req, res)
+      }
       if (url.pathname === "/api/scripts/import") {
         if (req.method !== "POST") {
           res.writeHead(405, { Allow: "POST", ...HEADERS })
