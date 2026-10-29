@@ -1,5 +1,6 @@
-# Basic web deployment only. Model binaries/weights are not installed by this blueprint.
-# AI features remain unavailable until self-hosted inference is provisioned on the same host.
+# Render 웹 서비스 하나(server.js)가 화면과 API를 함께 제공한다. 자체 모델 바이너리는 설치하지 않는다.
+# 텍스트 AI(/api/coach)는 Gemini API를 쓴다(AI_PROVIDER=gemini). GEMINI_API_KEY는 Render 화면(Environment)에서 직접 넣는다.
+# 키가 없으면 AI 기능만 꺼지고 나머지 기능은 그대로 쓸 수 있다. 자세한 절차: docs/gemini-coach.md
 services:
   - type: web
     name: speech-coach
@@ -14,3 +15,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      # 비밀값이라 파일에 적지 않는다. Render Environment에서 직접 넣는다.
+      - key: GEMINI_API_KEY
+        sync: false
