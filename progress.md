@@ -248,3 +248,10 @@
 - 구현: `server/segment-coach.js`(입력 검사·사용자 확인 요구·선택 문장 위치 일관성·이력 섞임 검사·흐름 규칙·후속 질문 3회 상한·요약 분리). 글 생성 단계는 기존 `/api/coach` 서비스의 concepts·question·review를 그대로 호출해 모델 선택·인용 검증·동시 처리·타임아웃·오류 처리를 재사용했다(새 모델 호출부 없음, Gemini 미사용). `server.js`는 라우트와 이 경로의 본문 한도(128KB)만 추가. 문서: [docs/segment-coach-api.md](docs/segment-coach-api.md).
 - 확인한 것: `node --test` 171개 통과(새 16개, 실제 HTTP로 대본 연결 → 구간 코칭, 가짜 자체 모델 응답). 네트워크 감시로 Google 요청 0건.
 - 한계: 대화 이력·사용자 확인은 클라이언트 값이라 질문 상한은 완전한 서버 보장이 아니다. 실제 모델 응답 품질과 발표 효과는 검증하지 않았다. 화면 연결 전.
+
+## 23. 구간 대화 기반 대본 문단 수정 API (브랜치 `feat/contextual-script-revision`, 백엔드만)
+
+- 요청(2026-10-30): 구간 코칭에서 확인한 문단과 대화를 바탕으로 그 문단만 고친 수정안을 돌려준다. 질문·대화는 다시 만들지 않고 `/api/coach/segment`의 요약·이력을 기존 수정 기능(`/api/coach` rewrite)에 연결한다.
+- 구현: `server/contextual-revision.js`(명시적 요청 필수, 문단 경계·원문 위치 검증, 이력·확인 문장 일치 검사, 대화 답에서 수정 필요 판단 — 의도한 쉼은 수정 불필요·불명확하면 추가 확인, 기존 rewrite 호출, 보존 문구 확인, 관찰/사용자 설명/추정/자료 근거/미확인 분리, 적용용 해시). `server/local-coach.js` rewrite에 선택 입력 `request`·`before`·`after`만 추가(없으면 기존 프롬프트 그대로). `server.js`는 라우트·본문 한도만. 문서: [docs/contextual-revision-api.md](docs/contextual-revision-api.md).
+- 확인한 것: `node --test` 201개 통과(새 17개, 실제 HTTP + 가짜 자체 모델 응답). 네트워크 감시로 Google 요청 0건.
+- 한계: 실제 모델 수정 품질·발표 효과는 검증하지 않았다. 보존 검사는 의미 동일을 보장하지 않는다. 화면 연결 전.
