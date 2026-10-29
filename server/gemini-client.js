@@ -106,12 +106,26 @@ export function parseGeminiResponse(body) {
 }
 
 /**
+ * 모델 계열별 생각(thinking) 설정. 지원하지 않는 값을 보내지 않도록 공식 문서 기준으로 고른다.
+ * - gemini-2.5-flash 계열: thinkingBudget 0(생각 끄기) 지원 → 지연·사용량을 줄인다.
+ * - gemini-3.x: 공식 모델 페이지 기준 3.8 Flash는 thinking level low·medium·high만 지원하고 minimal(생각 끄기에 해당)은 오류.
+ *   그래서 생각을 끄지 않고 지원 범위의 최저값 low를 쓴다. thinkingLevel과 thinkingBudget을 함께 보내면 400이라 하나만 보낸다.
+ * - 그 밖(예: 2.5 Pro는 생각을 끌 수 없음): 보내지 않고 모델 기본값을 쓴다.
+ */
+export function thinkingConfigFor(model) {
+  if (/^gemini-2\.5-flash(-lite)?(-|$)/.test(model)) return { thinkingBudget: 0 }
+  if (/^gemini-3(\.|-)/.test(model)) return { thinkingLevel: "low" }
+  return undefined
+}
+
+/**
  * Gemini 클라이언트. 재시도하지 않는다(사용자가 다시 누를 때만 다시 호출).
  * options: { apiKey, model, timeoutMs, fetchImpl, baseUrl }
  */
 export function createGeminiClient({ apiKey, model = DEFAULT_GEMINI_MODEL, timeoutMs = 30_000, fetchImpl = fetch, baseUrl = GEMINI_BASE_URL }) {
   if (!/^[a-z0-9][a-z0-9.-]{0,80}$/i.test(model)) throw new Error("invalid-model-name")
   const url = `${baseUrl}/models/${model}:generateContent`
+  const thinking = thinkingConfigFor(model)
   return {
     provider: "gemini",
     model,
@@ -130,7 +144,7 @@ export function createGeminiClient({ apiKey, model = DEFAULT_GEMINI_MODEL, timeo
               maxOutputTokens: MAX_OUTPUT_TOKENS,
               responseMimeType: "application/json",
               responseJsonSchema: schema,
-              thinkingConfig: { thinkingBudget: 0 }, // 생각 토큰을 쓰지 않아 지연·사용량을 줄인다
+              ...(thinking && { thinkingConfig: thinking }),
             },
           }),
           signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),

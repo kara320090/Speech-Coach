@@ -206,3 +206,9 @@
 - 조치: Google 오류의 HTTP 상태·열거 코드만 남기는 `providerDetail`, 상태 API `lastError`(정제 코드·안내만, 원문 메시지·키·요청 내용 없음), 생성 없는 `npm run gemini:check-models`(models.get). 모델·결제·생성 호출은 바꾸지 않았다.
 - 확인한 것: `node --test` 139개 통과(새 3개). 가짜 키를 넣고 전체 검사를 돌려도 Google 요청 0건(네트워크 감시). 키 없이 점검 명령을 실행하면 외부 요청 없이 끝남.
 - 남은 것: 사용자가 실제 키로 `npm run gemini:check-models gemini-2.5-flash gemini-3.8-flash gemini-3.5-flash-lite`를 실행해 결과 확인, 모델 결정.
+
+## 20. Gemini 3 생각 설정 호환성 수정 (브랜치 `fix/gemini-thinking-config`)
+
+- 배경(2026-10-30): 배포에서 `gemini-3.8-flash`로 '쉬운 대본 제안' 1회 실행 → "Gemini 서비스가 일시적으로 응답하지 않아요." 코드상 이 문구는 Google HTTP 5xx(504 제외)일 때만 나온다(우리 응답 503 `provider-unavailable`). 네트워크·시간 초과·응답 처리 문제는 아니다. 500/503 중 무엇인지는 당시 배포(`8b1ddd1`)에 진단 정보가 없어 미확인. PR #9(진단 `lastError`)는 CI 통과 후 병합(`0675a4e`).
+- 확인: `gemini-3.8-flash` 공식 모델 페이지는 thinking level low·medium·high만 지원하고 minimal(생각 끄기)은 오류라고 밝힌다. 기존 요청의 `thinkingBudget: 0`(생각 끄기)은 이와 맞지 않아 계열별 설정으로 바꿨다(2.5 Flash `thinkingBudget: 0`, 3.x `thinkingLevel: "low"`, 그 밖 미전송). 빈 문자열 enum은 공식 문서에 금지 문장이 없어 유지. temperature 1.0 권장은 비호환이 아니라 권장이라 유지하고 문서에 기록.
+- 확인한 것: `node --test` 140개 통과(새 1개). 네트워크 감시로 Google 요청 0건. 이 수정이 이번 5xx의 원인이었는지는 실제 재시험 전까지 단정하지 않는다.
