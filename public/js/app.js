@@ -299,6 +299,7 @@ function renderHeader() {
       h(
         "nav",
         { "aria-label": "주 메뉴" },
+        h("a", { href: "/studio.html", "aria-disabled": b ? "true" : null }, "새 스튜디오"),
         h("a", { href: "/coach.html", "aria-disabled": b ? "true" : null }, "대본 이해 연습"),
         h("a", { id: "nav-import", href: "/import.html", "aria-disabled": b ? "true" : null }, "영상 불러오기"),
         h("a", { id: "nav-history", href: "#/history", "aria-disabled": b ? "true" : null }, "연습 기록"),

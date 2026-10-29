@@ -18,8 +18,8 @@ const PREFS_KEY = "dasibom.studio"
 const SCRIPT_LIMIT = 20000 // /api/scripts/align·/api/coach/segment 대본 한도
 const SOURCES_LIMIT = 2400 // 근거 자료 한도(기존 코칭과 같음)
 const PARAGRAPH_LIMIT = 2400 // /api/scripts/revise-segment 대상 문단 한도
-const COACH_TYPES = new Set(["silence", "repeat", "filler", "gaze", "speed", "section"]) // /api/coach/segment가 받는 관찰 종류
-const TONE = { silence: "violet", repeat: "amber", filler: "amber", speed: "blue", gaze: "blue", section: "blue" }
+const COACH_TYPES = new Set(["manual", "silence", "repeat", "filler", "gaze", "speed", "section"]) // /api/coach/segment가 받는 관찰 종류
+const TONE = { manual: "violet", silence: "violet", repeat: "amber", filler: "amber", speed: "blue", gaze: "blue", section: "blue" }
 
 const EXAMPLE_SCRIPT = `안녕하세요. 오늘은 작은 습관이 만드는 큰 변화에 대해 이야기해 보겠습니다.
 
@@ -147,6 +147,9 @@ const state = {
   micId: prefs.micId || "",
   devices: { cams: [], mics: [] },
   file: { status: "idle", name: "", note: "", pending: null, controller: null },
+  aiConsent: false,
+  transcribe: false,
+  manualSecond: 0,
   model: null, // GET /api/model-status
   session: null, // 원본 연습 기록
   analysis: { running: false, progress: "", controller: null },
@@ -337,7 +340,7 @@ async function startRecording(kind) {
   if (rec.running) return
   rec.kind = kind
   rec.notices = []
-  if (!cam.capture) rec.notices.push(cam.notice || "마이크·카메라 없이 시간만 쟀어요. 소리 분석과 AI 코칭은 할 수 없어요.")
+  if (!cam.capture) rec.notices.push(cam.notice || "마이크·카메라 없이 시간만 쟀어요. 음성 측정은 할 수 없지만 검토 시점을 직접 골라 코칭할 수 있어요.")
   try {
     await cam.capture?.start({ recordVideo: true })
   } catch (e) {
@@ -406,7 +409,7 @@ function makeSession({ out, script, scriptVersionId, practiceOf = null }) {
   if (silence?.status === "no-signal") notices.push("녹음에 소리가 거의 없어서 긴 침묵을 찾지 않았어요. 마이크 연결을 확인해 주세요.")
   if (silence?.status === "too-short") notices.push("녹음이 너무 짧아서 긴 침묵을 찾지 않았어요.")
   const gaze = { status: "off", segments: [], offSec: 0 }
-  const settings = { targetSec, toleranceSec: 0, warnSec: 30, speedMin: 0, speedMax: 0, sections: [], planSignature: "", recordAudio: true, recordVideo: true, speechRequested: false, transcribe: true, raw: null }
+  const settings = { targetSec, toleranceSec: 0, warnSec: 30, speedMin: 0, speedMax: 0, sections: [], planSignature: "", recordAudio: true, recordVideo: true, speechRequested: false, transcribe: state.transcribe, raw: null }
   return {
     session: {
       id: newId(),
@@ -442,15 +445,16 @@ async function analyzeSession({ session, silence, gaze, audioOk }, samples, samp
   onUpdate()
   const saved = await saveSession(session)
   if (!saved.ok) session.notices.push(`기록을 이 기기에 저장하지 못했어요 (${saved.error}). 이 화면을 닫으면 다시 볼 수 없어요.`)
-  state.analysis.progress = "자체 AI 음성 전사를 준비해요. 소리만 보내고 영상·대본은 보내지 않아요."
+  state.analysis.progress = "동의한 경우에만 서버에 설정된 AI로 소리를 전사해요. 영상·얼굴은 보내지 않아요."
   onUpdate()
   const speech = await analyzeRecordedSpeech({
     samples: audioOk ? samples : null,
     sampleRate,
     durationSec: session.totalSec,
+    enabled: state.transcribe,
     signal: controller.signal,
     onProgress: (done, count) => {
-      state.analysis.progress = `자체 AI 음성 전사 ${done}/${count}개 조각 처리 중…`
+      state.analysis.progress = `음성 전사 ${done}/${count}개 조각 처리 중…`
       onUpdate()
     },
   })
@@ -468,7 +472,19 @@ async function analyzeSession({ session, silence, gaze, audioOk }, samples, samp
   onUpdate()
 }
 
-const coachItems = (session) => (session?.analysis?.items || []).filter((it) => COACH_TYPES.has(it.type))
+const coachItems = (session) => [...(session?.analysis?.items || []), ...(session?.reviewPoints || [])].filter((it) => COACH_TYPES.has(it.type))
+
+async function reviewManualPoint() {
+  if (!state.session || state.analysis.running) return
+  const sec = Math.max(0, Math.min(state.session.totalSec, Number(state.manualSecond) || 0))
+  const item = { id: `manual-${Date.now()}`, type: "manual", startSec: sec, endSec: sec, title: "직접 고른 검토 시점", measured: "사용자가 직접 선택 (측정 이상 아님)", basis: "사용자가 다시 보고 싶은 시점을 직접 골랐어요." }
+  state.session.reviewPoints = [item]
+  state.selected = coachItems(state.session).length - 1
+  state.coach = null; state.revision = null; state.aiConsent = false
+  await saveSession(state.session)
+  await alignSession(state.session)
+}
+
 
 /** POST /api/scripts/align: 검토 지점마다 대본 문장 후보를 받는다(전사가 없으면 모두 unmatched). */
 async function alignSession(session) {
@@ -483,7 +499,7 @@ async function alignSession(session) {
     const data = await postJson("/api/scripts/align", {
       scriptVersionId: session.scriptVersionId,
       script: session.script,
-      segments: (session.transcript || []).slice(0, 2000).map((s) => ({ startSecond: time(s.startSec), endSecond: time(Math.max(s.endSec, s.startSec)), text: s.text.slice(0, 1000) })),
+      segments: (session.transcript || []).slice(0, 2000).map((s) => ({ startSecond: time(s.startSec), endSecond: time(Math.max(s.endSec, s.startSec)), text: s.text.slice(0, 1000), ...(s.timingPrecision === "chunk" && { timingPrecision: "chunk" }) })),
       points: items.map((it) => ({ id: pointIdOf(it), startSecond: time(it.startSec), endSecond: time(Math.max(it.endSec, it.startSec)) })),
     })
     state.align = { status: "ok", data }
@@ -505,6 +521,7 @@ function sentenceById(id) {
   return state.align?.data?.sentences.find((s) => s.id === id) || null
 }
 function resetPick() {
+  state.aiConsent = false
   const point = alignPoint(selectedItem())
   state.pick = point?.status === "matched" ? { sentenceId: point.primarySentenceId, confirmation: null } : null
   state.choosingSentence = point?.status === "unmatched"
@@ -552,6 +569,7 @@ function appHeader() {
     h("nav", { class: "header-nav", "aria-label": "주 메뉴" },
       h("a", { href: "/", text: "기본 연습 화면" }),
       h("a", { href: "/#/history", text: "연습 기록" }),
+      state.applied && h("button", { disabled: rec.running || state.analysis.running, onclick: restoreRevision, text: "수정 전 대본으로 되돌리기" }),
       h("button", { onclick: () => { state.onboarding = true; render() }, disabled: rec.running, text: "사용 방법" }),
     ),
   )
@@ -712,6 +730,7 @@ function prepareScreen() {
           h("div", { class: "time-options" },
             [3, 5, 10].map((m) => h("button", { class: state.targetMinutes === m ? "is-selected" : "", "aria-pressed": String(state.targetMinutes === m), onclick: () => { state.targetMinutes = m; savePrefs(); render() } }, icon("clock", 17), `${m}분`)),
           ),
+          h("label", { class: "studio-consent" }, h("input", { type: "checkbox", checked: state.transcribe, onchange: (e) => { state.transcribe = e.target.checked } }), "녹음 소리를 AI로 전사하는 데 동의해요 (분석 시 유료 사용량이 발생할 수 있어요)."),
           deviceSelect("카메라", "cam"),
           deviceSelect("마이크", "mic"),
           h("p", { class: "input-caption", text: state.devices.cams.some((d) => d.label) ? "다음 화면에서 고른 장치로 연결해요." : "장치 이름은 카메라 권한을 허용한 뒤에 보여요." }),
@@ -763,7 +782,7 @@ function practiceScreen() {
     ),
     recordingControls({ kind: "full", startLabel: "녹화 시작", stopLabel: "연습 종료", onStop: finishPractice, rightLabel: "남은 시간" }),
     h("p", { class: "demo-disclaimer", "data-cam-status": "", text: CAM_TEXT[cam.status] }),
-    h("p", { class: "demo-disclaimer", text: "영상과 녹음은 이 브라우저(IndexedDB)에만 저장해요. 분석 단계에서 소리만 자체 AI 전사 서버로 보내요." }),
+    h("p", { class: "demo-disclaimer", text: "영상과 녹음은 이 브라우저(IndexedDB)에만 저장해요. 준비 화면에서 동의한 경우 분석 단계에서 소리를 서버에 설정된 음성 인식으로 보내요." }),
   )
 }
 
@@ -867,6 +886,11 @@ function resultsScreen() {
       ),
     ),
     noticeList(s),
+    !state.analysis.running && h("div", { class: "card manual-review" },
+      h("h2", { text: "직접 검토할 시점 선택" }),
+      h("p", { text: "자동으로 잡힌 구간이 없어도 다시 보고 싶은 시점을 고를 수 있어요. 직접 선택한 위치는 측정 이상으로 취급하지 않아요." }),
+      h("label", {}, "검토 시점(초)", h("input", { type: "number", min: 0, max: s.totalSec, step: 1, "aria-label": "검토 시점(초)", value: state.manualSecond, oninput: (e) => { state.manualSecond = e.target.value } })),
+      h("button", { class: "button button--soft", onclick: reviewManualPoint, text: "이 시점의 대본 확인" })),
     item && alignmentCard(item),
     !items.length && !state.analysis.running && h("div", { class: "screen-actions" },
       h("span", { text: "같은 대본으로 다시 녹화하거나 대본을 고친 뒤 연습할 수 있어요." }),
@@ -893,6 +917,7 @@ function alignmentCard(item) {
     unmatched: ["대본에서 가까운 문장을 찾지 못했어요", "전사가 없거나 대본과 비슷하지 않았어요. 아래 문장 중에서 직접 골라 주세요."],
   }[point.status]
   const choose = (id) => {
+    state.aiConsent = false
     state.pick = { sentenceId: id, confirmation: null }
     render()
   }
@@ -944,17 +969,18 @@ function ensureCoach() {
   const c = state.coach
   if (c && c.pointId === pointId && c.sentenceId === sentence.id && c.history.length) return
   state.coach = { pointId, sentenceId: sentence.id, history: [], log: [], last: null, busy: false, controller: null, error: "", draft: "" }
-  sendCoach({ type: "start" }, null)
+  if (state.aiConsent) sendCoach({ type: "start" }, null)
+  else render()
 }
 
 function seg(g) {
-  return g && { startSecond: g.startSecond, endSecond: g.endSecond, text: g.text.slice(0, 1000) }
+  return g && { startSecond: g.startSecond, endSecond: g.endSecond, text: g.text.slice(0, 1000), ...(g.timingPrecision === "chunk" && { timingPrecision: "chunk" }) }
 }
 
 async function sendCoach(action, shown) {
   const c = state.coach
   const { item, point, sentence, pointId } = coachContext()
-  if (!c || c.busy || !sentence) return
+  if (!c || c.busy || !sentence || !state.aiConsent) return
   const s = state.session
   const ids = { practiceId: s.id, pointId, scriptVersionId: s.scriptVersionId }
   const lastKey = c.last?.message?.questionKey
@@ -976,7 +1002,8 @@ async function sendCoach(action, shown) {
       history: c.history,
       action: act,
     }, c.controller.signal)
-    if (state.coach !== c) return
+    if (state.coach !== c || c.controller.signal.aborted) return
+    if (data.practiceId !== s.id || data.pointId !== pointId || data.scriptVersionId !== s.scriptVersionId) throw new Error("다른 연습의 응답이라 사용하지 않았어요.")
     if (act.type !== "start") c.history.push({ role: "user", questionKey: lastKey, action: act.type, ...(act.reason && { reason: act.reason }), ...(act.text && { text: act.text }), ...ids })
     c.history.push(data.message)
     c.log.push({ role: "ai", text: data.message.text })
@@ -1063,21 +1090,26 @@ function coachScreen() {
       ),
       h("div", { class: "card chat-card" },
         h("div", { class: "chat-header" },
-          h("div", {}, h("span", { class: "ai-orb" }, icon("sparkle", 19)), h("div", {}, h("strong", { text: "다시봄 코치" }), h("span", { text: last?.model ? `자체 AI · ${last.promptVersion}` : "구간 코칭" }))),
+          h("div", {}, h("span", { class: "ai-orb" }, icon("sparkle", 19)), h("div", {}, h("strong", { text: "다시봄 코치" }), h("span", { text: last?.model ? `${last.model} · ${last.promptVersion}` : "구간 코칭" }))),
           h("span", { text: `후속 질문 ${last?.followupCount ?? 0} / ${last?.followupLimit ?? 3}` }),
         ),
+        h("div", { class: "studio-ai-notice" },
+          h("p", { text: state.model?.processingNotice || "선택한 대본·자료·답변을 서버에 설정된 AI로 보내요. 영상·얼굴은 보내지 않아요." }),
+          h("p", { text: `모델: ${state.model?.model || "AI 미설정"} · ${state.model?.ready ? "호출 가능" : "AI 미설정: 풀이·수정안은 사용할 수 없지만 상황 질문은 가능해요."}` }),
+          h("label", { class: "studio-consent" }, h("input", { type: "checkbox", checked: state.aiConsent, onchange: (e) => { state.aiConsent = e.target.checked; if (!state.aiConsent) { c.controller?.abort(); state.revision?.controller?.abort() }; render() } }), "선택한 대본·근거 자료·답변의 AI 전송에 동의해요."),
+          !last && h("button", { class: "button button--primary", disabled: !state.aiConsent || c.busy, onclick: () => sendCoach({ type: "start" }, null), text: "동의하고 대화 시작" })),
         messages,
         !done
           ? h("div", { class: "chat-compose" },
               h("div", { class: "quick-replies" },
-                choices.map((ch) => h("button", { disabled: c.busy, onclick: () => answerChoice(ch), text: ch.label })),
-                [["unknown", "모르겠어요"], ["explain", "설명해 주세요"], ["skip", "건너뛰기"]].filter(([v]) => !choices.some((ch) => ch.value === v)).map(([value, label]) => h("button", { class: "quick-reply--plain", disabled: c.busy || !last, onclick: () => answerChoice({ value, label }), text: label })),
+                choices.map((ch) => h("button", { disabled: c.busy || !state.aiConsent, onclick: () => answerChoice(ch), text: ch.label })),
+                [["unknown", "모르겠어요"], ["explain", "설명해 주세요"], ["skip", "건너뛰기"]].filter(([v]) => !choices.some((ch) => ch.value === v)).map(([value, label]) => h("button", { class: "quick-reply--plain", disabled: c.busy || !last || !state.aiConsent, onclick: () => answerChoice({ value, label }), text: label })),
               ),
               h("div", { class: "compose-row" },
-                h("textarea", { "aria-label": "답변 입력", maxlength: 1000, placeholder: last?.message?.questionKey === "situation" ? "선택지에 없으면 직접 적어 주세요." : "생각을 편하게 적어 주세요.", value: c.draft, disabled: c.busy,
+                h("textarea", { "aria-label": "답변 입력", maxlength: 1000, placeholder: last?.message?.questionKey === "situation" ? "선택지에 없으면 직접 적어 주세요." : "생각을 편하게 적어 주세요.", value: c.draft, disabled: c.busy || !state.aiConsent,
                   oninput: (e) => { c.draft = e.target.value },
                   onkeydown: (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); answerText() } } }),
-                h("button", { "aria-label": "보내기", disabled: c.busy || !last, onclick: answerText }, icon("arrow", 19)),
+                h("button", { "aria-label": "보내기", disabled: c.busy || !last || !state.aiConsent, onclick: answerText }, icon("arrow", 19)),
               ),
             )
           : h("div", { class: "coach-summary" },
@@ -1087,12 +1119,12 @@ function coachScreen() {
               ),
               h("div", { class: "coach-summary__actions" },
                 h("button", { class: "button button--ghost", onclick: () => goTo("results"), text: "다른 구간 살펴보기" }),
-                h("button", { class: "button button--primary", onclick: () => { state.revision = null; goTo("revision") } }, "이 문단 고치기", icon("arrow", 17)),
+                h("button", { class: "button button--primary", disabled: !state.aiConsent || !state.model?.ready, onclick: () => { state.revision = null; goTo("revision") } }, "이 문단 고치기", icon("arrow", 17)),
               ),
             ),
       ),
     ),
-    h("p", { class: "demo-disclaimer", text: "선택한 문장과 앞뒤 한 문장, 근거 자료, 답변만 서버의 자체 AI로 보내요. 대화는 서버에 저장하지 않고 이 기기의 연습 기록에만 남아요." }),
+    h("p", { class: "demo-disclaimer", text: "선택한 문장과 문맥, 근거 자료, 답변을 서버에 설정된 AI로 보내요. 대화는 서버에 저장하지 않고 이 기기의 연습 기록에만 남아요." }),
   )
 }
 
@@ -1118,6 +1150,7 @@ async function requestRevision() {
   const { sentence, pointId } = coachContext()
   const s = state.session
   if (!r || r.busy || !sentence) return
+  if (!state.aiConsent || !state.model?.ready) { r.error = "AI 전송 동의와 서버의 연결 상태를 확인해 주세요."; return render() }
   const para = paragraphOf(sentence)
   if (para.text.length > PARAGRAPH_LIMIT) {
     r.error = `이 문단은 ${para.text.length.toLocaleString()}자라 한 번에 고칠 수 없어요(${PARAGRAPH_LIMIT.toLocaleString()}자까지). 준비 단계에서 빈 줄로 문단을 나눠 주세요.`
@@ -1140,7 +1173,8 @@ async function requestRevision() {
       coaching: { summary: { observations: summary.observations, location: { sentenceId: sentence.id }, userReports: summary.userReports }, history: state.coach.history },
       request: { explicit: true, focus: r.focus, text: r.requestText.trim() },
     }, r.controller.signal)
-    if (state.revision !== r) return
+    if (state.revision !== r || r.controller.signal.aborted) return
+    if (data.practiceId !== s.id || data.pointId !== pointId || data.scriptVersionId !== s.scriptVersionId) throw new Error("다른 연습의 수정안이라 사용하지 않았어요.")
     r.data = data
     r.proposal = data.revision?.text || ""
     r.editing = false
@@ -1170,13 +1204,13 @@ async function applyRevision() {
     r.error = "수정안을 만든 뒤 대본이 바뀌었어요. 다시 요청해 주세요."
     return render()
   }
-  if (state.script !== base && !state.script.includes(original)) {
-    r.error = "지금 대본에서 이 문단을 찾지 못했어요. 준비 단계에서 대본을 확인한 뒤 다시 요청해 주세요."
+  if (state.script !== base || state.versions.at(-1)?.id !== baseScriptVersionId) {
+    r.error = "수정안을 만든 뒤 대본 버전이 바뀌었어요. 위치 확인부터 다시 진행해 주세요."
     return render()
   }
-  // 이 범위만 바꾼 새 버전을 만든다. 원본 버전과 이전 연습 기록은 그대로 둔다.
-  const from = state.script === base ? start : state.script.indexOf(original)
-  state.script = state.script.slice(0, from) + r.proposal + state.script.slice(from + original.length)
+  const checked = checkRevision(d.target.text, r.proposal)
+  if (d.preservation?.blocked || checked.blocked || !r.meaningConfirmed) { r.error = "보존 검사와 뜻 보존 확인을 마쳐 주세요."; return render() }
+  state.script = state.script.slice(0, start) + r.proposal + state.script.slice(end)
   state.scriptSource = "revision"
   const versionId = currentVersionId("revision")
   const v = state.versions.find((x) => x.id === versionId)
@@ -1187,6 +1221,15 @@ async function applyRevision() {
   saveSession(s)
   state.repractice = null
   goTo("repractice")
+}
+
+function restoreRevision() {
+  const applied = state.applied
+  const base = state.versions.find(v => v.id === applied?.baseVersionId)
+  if (!base || state.versions.at(-1)?.id !== applied?.versionId) return
+  state.script = base.script; state.scriptSource = "restore"; currentVersionId("restore"); savePrefs()
+  state.applied = null; state.revision = null; state.coach = null; state.aiConsent = false
+  goTo("prepare")
 }
 
 function toggleEditing(r) {
@@ -1237,10 +1280,10 @@ function revisionScreen() {
   const p = d.preservation || {}
   const local = r.localCheck
   const warnings = [...new Set([...(local ? local.warnings : p.warnings || []), ...(p.mustPreserveMissing || []).map((m) => `보존 문구 누락: ${m}`)])]
-  const blocked = local ? local.blocked : p.blocked
+  const blocked = Boolean(p.blocked || (local ? local.blocked : false))
   const evidence = d.basis?.evidence || []
   const proposalBox = r.editing
-    ? h("textarea", { "aria-label": "수정안 직접 편집", value: r.proposal, oninput: (e) => { r.proposal = e.target.value } })
+    ? h("textarea", { "aria-label": "수정안 직접 편집", value: r.proposal, oninput: (e) => { r.proposal = e.target.value; r.meaningConfirmed = false } })
     : h("p", { text: r.proposal })
   return h("section", { class: "screen" }, title,
     h("div", { class: "revision-banner" },
@@ -1269,13 +1312,14 @@ function revisionScreen() {
           h("p", { text: warnings.length ? warnings.join(" · ") : p.note || "수치·단위·부정·조건 표현이 유지됐어요. 의미가 같다고 보장하지는 않아요." })),
       ),
     ),
+    h("label", { class: "studio-consent" }, h("input", { type: "checkbox", checked: Boolean(r.meaningConfirmed), onchange: (e) => { r.meaningConfirmed = e.target.checked; render() } }), "수치·조건·부정 표현과 원래 뜻을 직접 확인했어요."),
     d.basis?.unverified?.length ? h("p", { class: "align-reason", text: `설명 정확성은 확인되지 않았어요: ${d.basis.unverified.join(" ")}` }) : null,
     r.error && h("p", { class: "coach-error", role: "alert", text: r.error }),
     h("div", { class: "screen-actions" },
       back,
       h("span", { text: blocked ? "수치·단위가 바뀌었거나 빠졌어요. 직접 편집해 고친 뒤 검사해 주세요." : "적용하면 대상 문단만 교체되고 원문과 이전 기록은 유지됩니다." }),
       h("button", { class: "button button--soft", onclick: () => { r.data = null; requestRevision() }, text: "다시 만들기" }),
-      h("button", { class: "button button--primary", disabled: blocked || r.editing, onclick: applyRevision }, "수정안 적용하기", icon("check", 17)),
+      h("button", { class: "button button--primary", disabled: blocked || r.editing || !r.meaningConfirmed, onclick: applyRevision }, "수정안 적용하기", icon("check", 17)),
     ),
   )
 }
@@ -1491,5 +1535,5 @@ window.addEventListener("pagehide", () => releaseCamera())
 navigator.mediaDevices?.addEventListener?.("devicechange", () => refreshDevices().then(() => state.stage === "prepare" && render()))
 
 refreshDevices().then(render)
-loadModelStatus().then(() => state.onboarding && render())
+loadModelStatus().then(render)
 render()

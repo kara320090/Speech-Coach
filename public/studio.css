@@ -3034,3 +3034,6 @@ button:disabled {
     display: none;
   }
 }
+
+/* Actual processing consent and manual review, independent of measured anomalies. */
+.studio-consent{display:flex;align-items:flex-start;gap:10px;line-height:1.8;font-size:13px;margin:16px 0}.studio-consent input{flex-shrink:0;margin-top:5px;accent-color:#6956d9}.studio-ai-notice{padding:16px;background:#f0edff;border-radius:12px;margin:0 20px}.studio-ai-notice p{font-size:12px;line-height:1.8}.manual-review{padding:22px;margin:24px 0}.manual-review input{border:1px solid #ddd;border-radius:8px;padding:10px;margin:0 16px;width:110px}

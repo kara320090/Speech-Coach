@@ -158,7 +158,7 @@ export function createContextualRevision({ coach, now = () => Date.now(), limits
         apply: { baseScriptVersionId: input.scriptVersionId, start: input.target.start, end: input.target.end, originalSha256: sha256(input.target.text), scriptSha256: sha256(input.script), note: "적용 전 현재 대본이 같은 버전이고 이 범위의 원문이 그대로인지 확인한 뒤, 이 범위만 바꾼 새 버전을 만들어 주세요. 서버는 대본을 바꾸지 않아요." },
       }
       const basis = (extra = {}) => ({
-        observations: input.observations.map((o) => ({ ...o, source: "client-reported-measurement", note: "측정값이며 원인 근거로 쓰지 않았어요." })),
+        observations: input.observations.map((o) => ({ ...o, source: o.type === "manual" ? "user-selected" : "client-reported-measurement", note: o.type === "manual" ? "사용자가 고른 시점이며 측정 이상이나 원인 근거가 아니에요." : "측정값이며 원인 근거로 쓰지 않았어요." })),
         userReports: input.userReports.map((u) => ({ ...u, source: "user" })),
         inferredNeeds: needs.map((n) => ({ ...n, source: n.from === "user-request" ? "user-request" : "inferred-from-user-answer" })),
         ...extra,

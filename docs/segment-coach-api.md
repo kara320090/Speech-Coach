@@ -175,3 +175,7 @@
 - `server/segment-coach.js`: 입력 검사(선택 문장 일관성은 `server/script-align.js`의 `splitScript` 재사용), 흐름 규칙, 기존 코칭 서비스 호출, 요약. 표현 후보·질문 상한은 화면 규칙(`public/js/coach.js`의 `keywordsOf`·`QUESTION_LIMIT`)을 읽기만 한다.
 - `server.js`: 라우트 연결·이 경로의 본문 한도만 추가.
 - `tests/segment-coach.test.mjs`: 실제 HTTP로 `/api/scripts/align` → `/api/coach/segment` 흐름을 검사(가짜 자체 모델 응답) 16개.
+
+### 사용자가 직접 고른 시점
+
+`point.observations[].type: "manual"`은 사용자가 직접 고른 검토 위치다. 자동 감지된 이상이나 측정값으로 단정하지 않으며 요약의 `source`는 `user-selected`로 반환한다. 이 사유만으로 수정 필요나 이해 부족을 추정하지 않는다.
