@@ -1,10 +1,12 @@
-# Gemini는 새 대본 생성에만 사용
+# Gemini 새 대본·선택한 도움 대화와 자체 AI의 역할
 
-기준일: 2026-10-30. 사용자가 지정한 역할은 **새 대본 생성 = Gemini 3.8 Flash**, **기존 대본 분석·쉬운 표현 수정·질문·답변 검토·음성 전사 = 자체 AI**다. 두 서비스의 상태·실패·호출량은 분리한다.
+새 대본 생성(F22)과 사용자가 별도로 동의해 선택한 상황 대화(F23)는 Gemini 3.8 Flash로 처리한다. F22는 주제·근거만, F23은 선택한 대본·근거·관찰 텍스트·현재 대화 답변만 전송한다. F23은 열린 질문으로 시작하고 쉬운 대본을 만들지 먼저 물으며 확인한 초안만 다음 연습에 적용한다. 기존 `/coach.html`의 개념·수정·질문·답변 검토와 구간 코칭 API는 Qwen, 음성 전사는 faster-whisper를 유지한다. 자동 공급자 대체는 없다. [도움 대화 명세](supportive-coach.md)를 따른다.
 
 | 화면·API | 처리 위치 | 전송 입력 |
 | --- | --- | --- |
 | `/create-script.html`, `POST /api/scripts/generate` | Google Gemini (`gemini-3.8-flash`) | 사용자가 생성 버튼을 누른 주제·근거 자료만 |
+| `/support-coach.html`, `POST /api/coach/support` | Google Gemini (`gemini-3.8-flash`) | 전송 동의한 대본·관찰 텍스트·근거·이 대화 답변. 수정 생성은 별도 허락 |
+| `GET /api/coach/support-status` | 서버의 도움 대화 상태 | 외부 생성 요청 없음 |
 | `GET /api/scripts/generation-status` | 서버의 생성 상태 조회 | 외부 생성 요청 없음 |
 | `/coach.html`, `POST /api/coach` | PC의 Qwen·llama.cpp | 기존 대본·자료·질문·답변 |
 | `GET /api/model-status` | 자체 모델·에이전트 상태 조회 | Gemini 호출 없음 |
@@ -23,7 +25,7 @@
 
 - `GEMINI_MODEL=gemini-3.8-flash`, `GEMINI_API_KEY`는 Render 환경변수에만 저장한다. Git·화면·로그·응답에 키를 넣지 않는다.
 - `GEMINI_TIMEOUT_MS`: 기본 55,000ms, 범위 5,000~60,000ms. 모델은 자동 교체하지 않는다.
-- `AI_MAX_REQUESTS_PER_MINUTE=10`, `AI_MAX_REQUESTS_PER_DAY=200`, `AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE=4`, `AI_MAX_CONCURRENT=2`는 **새 대본 생성에만** 적용한다. 재배포·여러 인스턴스에서 공유되는 비용 상한은 아니다.
+- `AI_MAX_REQUESTS_PER_MINUTE=10`, `AI_MAX_REQUESTS_PER_DAY=200`, `AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE=4`, `AI_MAX_CONCURRENT=2`는 새 대본 서비스와 도움 대화 서비스에 각각 적용한다. 도움 대화의 기기별 기본값은 6회다. 재배포·여러 인스턴스에서 공유되는 비용 상한은 아니다.
 - 3.x는 `thinkingLevel:low`, 명시적으로 2.5를 선택하면 기존 `thinkingBudget:0`을 사용한다. `maxOutputTokens=2048`, JSON Schema와 서버 길이·형식 검사를 적용한다.
 - 같은 진행 중 요청은 중복 생성하지 않고, 다른 주제는 서로 구분한다. 429에는 대기 시간과 `Retry-After`를 적용한다. 자동 재시도·자동 공급자 전환은 없다.
 - 상태의 `keyConfigured:true`는 키 존재만 의미한다. `connection:verified`는 실제 생성 응답을 받은 상태다. 인증·모델 설정 오류는 생성 서비스 안에서만 중단한다. 503·시간 초과는 별도로 안내한다.
@@ -39,3 +41,5 @@ Render는 `AI_EXECUTION_MODE=agent`로 운영 PC의 서명된 에이전트와 �
 ## 모델 진단
 
 `npm run gemini:check-models`는 models.get으로 모델 정보 접근 여부만 확인하며 생성하지 않는다. 정보 조회 성공은 실제 대본 생성 성공·무료 사용 가능을 보장하지 않는다. 생성 상태 API의 lastError에는 코드·HTTP 상태·Google 열거 코드·시간·안내만 남기며 원문 메시지·키·프로젝트·입력은 넣지 않는다. 성공하면 지운다. 진단은 생성 서비스 상태에서 확인하고 자체 AI 코칭과 구분한다.
+
+도움 대화의 동의·질문 상한·수정 허락·저장·오류·검사 범위는 [F23 명세](supportive-coach.md)를 따른다.

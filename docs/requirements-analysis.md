@@ -8,7 +8,7 @@ F16은 파일 불러오기와 함께 메인 녹화의 분석 버튼에서도 동
 
 ## 2026-10-30 AI 처리 역할
 
-새 대본 생성(F22)은 `/create-script.html`·`POST /api/scripts/generate`에서 Gemini 3.8 Flash로 처리한다. 사용자가 입력한 주제·근거 자료만 전송하며, 초안 확인 후 기존 기록을 보존한 새 버전으로 저장한다. 기존 대본의 개념 분석·쉬운 표현 수정·질문·답변 검토는 Qwen, 음성 전사는 faster-whisper로 처리한다. 자체 AI와 Gemini의 상태·실패는 독립적이며 자동 공급자 대체는 없다. API·설정은 [역할 분리 명세](gemini-coach.md)를 따른다.
+새 대본 생성(F22)과 사용자가 별도로 동의해 선택한 상황 대화(F23)는 Gemini 3.8 Flash로 처리한다. F22는 주제·근거만, F23은 선택한 대본·근거·관찰 텍스트·현재 대화 답변만 전송한다. F23은 열린 질문으로 시작하고 쉬운 대본을 만들지 먼저 물으며 확인한 초안만 다음 연습에 적용한다. 기존 `/coach.html`의 개념·수정·질문·답변 검토와 구간 코칭 API는 Qwen, 음성 전사는 faster-whisper를 유지한다. 자동 공급자 대체는 없다. [AI 역할](gemini-coach.md)·[도움 대화 명세](supportive-coach.md)를 따른다.
 
 **현재 구현 상태:** 자체 실행 텍스트 코칭과 음성 전사의 첫 구현이 추가됐다. 아래 전체 기획의 완료 조건과 구현된 부분은 [구현 범위](local-ai-implementation.md)에서 구분한다. 외부 AI Gateway와 브라우저 실시간 음성 인식은 제거/비활성화했다.
 
@@ -277,3 +277,9 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 ## 생성·코칭의 분리 인터페이스
 
 `GET /api/scripts/generation-status`는 생성 서비스, `GET /api/model-status`는 자체 AI 상태를 반환한다. 새 대본 요청은 task=generate·topic·sources·requestId·versionId만 허용한다. 생성 결과의 title·script·notes를 길이·형식 검사 후 사용자 검토 초안으로 반환한다. Gemini의 실패 상태·한도는 생성 서비스에만 적용한다.
+
+## F23 분석 — 결과에서 대화와 다음 연습으로
+
+`renderResults`의 링크가 녹음 ID·선택 검토 ID만 같은 출처의 `support-coach.html`로 넘긴다. 페이지는 브라우저의 세션에서 대본·관찰만 읽고 전송 범위를 보여 준다. 최대 2,400자 부분 선택과 선택 해제한 관찰을 적용하고, 동의 뒤 텍스트만 `/api/coach/support`로 보낸다. `support-coach.js`는 `supportSpec`과 기존 Gemini REST 클라이언트·제한·오류 처리를 사용한다. 기본 `/api/coach`·`/api/coach/segment`·`/api/transcribe`는 기존 자체 모델 경로다.
+
+대화의 관찰과 본인 답변을 구분하고 원인 판정 필드는 만들지 않는다. 수정은 대화 후 별도 허락과 버전 일치를 확인한다. 제안은 숫자 보존 규칙과 직접 확인을 거쳐 적용한다. 새 대본 버전을 별도 IndexedDB에 추가하고 메인 localStorage의 다음 연습 대본만 바꾸며, 선택 밖 문장과 이전 녹음 세션은 보존한다. 직전 대본 되돌리기는 이후 수정 여부를 확인한다. 대화는 탭 sessionStorage에 임시 보관하고 지울 수 있다. [데이터·한도·오류 명세](supportive-coach.md).

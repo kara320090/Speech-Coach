@@ -19,7 +19,7 @@
 
 ## 2026-10-30 AI 처리 역할
 
-새 대본 생성(F22)은 `/create-script.html`·`POST /api/scripts/generate`에서 Gemini 3.8 Flash로 처리한다. 사용자가 입력한 주제·근거 자료만 전송하며, 초안 확인 후 기존 기록을 보존한 새 버전으로 저장한다. 기존 대본의 개념 분석·쉬운 표현 수정·질문·답변 검토는 Qwen, 음성 전사는 faster-whisper로 처리한다. 자체 AI와 Gemini의 상태·실패는 독립적이며 자동 공급자 대체는 없다. API·설정은 [역할 분리 명세](gemini-coach.md)를 따른다.
+새 대본 생성(F22)과 사용자가 별도로 동의해 선택한 상황 대화(F23)는 Gemini 3.8 Flash로 처리한다. F22는 주제·근거만, F23은 선택한 대본·근거·관찰 텍스트·현재 대화 답변만 전송한다. F23은 열린 질문으로 시작하고 쉬운 대본을 만들지 먼저 물으며 확인한 초안만 다음 연습에 적용한다. 기존 `/coach.html`의 개념·수정·질문·답변 검토와 구간 코칭 API는 Qwen, 음성 전사는 faster-whisper를 유지한다. 자동 공급자 대체는 없다. [AI 역할](gemini-coach.md)·[도움 대화 명세](supportive-coach.md)를 따른다.
 
 ## 2026-10-30 main 통합 상태
 
@@ -92,8 +92,16 @@ F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measur
 | --- | --- | --- | --- | --- |
 | F22 | FR-22 / AC-22 | UI-CREATE NC4 | script-generation.js·create-script-page.js·gemini-coach.test.mjs·coach-provider.spec.ts | 새 대본 생성·확인·원본 보존·자체 코칭 이동 |
 
-F17–F20·F16은 자체 모델로 처리하며, F22만 외부 Gemini를 사용한다. 주최 측 S1–S4·S9와 scenarios.yaml의 흐름은 유지한다.
+F17–F20·F16은 자체 모델로 처리하며, 새 대본 F22와 별도 동의한 도움 대화 F23은 Gemini를 사용한다. 주최 측 S1–S4·S9와 scenarios.yaml의 흐름은 유지한다.
 
 ## 메인 전사 연결 검증
 
 F16·FR-16·AC-16은 메인 분석과 파일 가져오기에서 동일한 자체 전사 API를 사용한다. `recording-analysis.js`·`tests/recording-analysis.test.mjs`가 짧은 녹음·선택 해제·서버 없음·부분 실패·취소를 검증한다. `e2e/media/main-transcription.spec.ts`는 메인 버튼→WAV 요청→군말·속도·재생 위치·재조회와 원본 보존을 검증한다. 주최 측 S1–S4·S9와 버튼 이름은 유지한다.
+
+## F23 추적 — 별도 선택 기능
+
+| 기능·수용 조건 | 화면 | 코드 | 검사 | 전송·적용 경계 |
+| --- | --- | --- | --- | --- |
+| F23 / FR-23 / AC-23 | 결과 → UI-SUPPORT | support-coach.js·support-page.js·support-state.js | tests/support-coach.test.mjs, e2e/media/support-coach.spec.ts | 동의한 텍스트만 Gemini, 허락 후 초안 생성·확인 후 다음 연습 적용 |
+
+제출 S1–S7·S9의 8개 흐름과 기존 장치·키 없는 완료 조건을 유지한다. F23의 브라우저 검사는 가짜 공급자 응답을 사용하고 실제 공개 Gemini 응답은 progress.md에 따로 구분한다.

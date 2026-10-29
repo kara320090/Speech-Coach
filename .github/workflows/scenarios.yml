@@ -46,12 +46,18 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: Run unit tests
+        run: |
+          npm ci --omit=optional --no-audit --no-fund
+          node --test --test-concurrency=1
       - name: Run scenario E2E
         working-directory: e2e
         run: |
           npm install
           npx playwright install --with-deps chromium
           npx playwright test --pass-with-no-tests --forbid-only
+          # Optional Gemini UX uses fake provider responses; no real Google calls in CI.
+          npx playwright test -c media.config.ts support-coach.spec.ts coach-provider.spec.ts --forbid-only
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7

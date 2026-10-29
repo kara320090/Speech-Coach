@@ -1,6 +1,6 @@
 // 외부 모델 공급자(현재 Gemini)로 /api/coach 과업을 실행한다. 모델 호출은 client.generateJson에 맡기고,
 // 입력 검사·프롬프트·출력 검증(원문 인용·수치·단위·형식)은 자체 모델과 같은 local-coach.js 규칙을 그대로 쓴다.
-// 생성 요청은 사용자가 AI 실행을 누른 /api/coach 요청에서만 보낸다. 상태 확인은 외부로 요청하지 않는다.
+// 별도로 선택한 새 대본·도움 대화 서비스가 사용한다. /api/coach 기본 코칭은 자체 모델이며 상태 확인은 외부로 요청하지 않는다.
 // 호출량 제한은 이 서버 프로세스 메모리에만 있어서 재시작·여러 인스턴스에서는 초기화·분산된다(예산을 완전히 보장하지 않음).
 import { createHash } from "node:crypto"
 import { CoachError, PROMPT_VERSION, buildMessages, outputSchema, validateInput, validateOutput } from "./local-coach.js"

@@ -1,0 +1,2 @@
+# Keep the pinned third-party SDK/model bytes identical on Windows and Linux.
+public/vendor/** -text
