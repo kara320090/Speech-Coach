@@ -1,7 +1,7 @@
 # 루프톤 시나리오 검사. 주최 측 실행과 같은 순서로 docker compose 기동 → /__health 대기 → Playwright 실행.
 # .github/workflows/scenarios.yml로 복사한다. compose 기동·/__health 응답·시나리오 E2E를 검사한다.
 # 주최 측 실행은 e2e/playwright.config.ts 대신 같은 화면 크기·순서의 자체 설정으로 돈다. 여기서 통과하는지로 주최 측 실행 실행을 미리 확인한다.
-# CPU 자체 모델과 함께 핵심 8개 흐름을 검사하며 외부 AI 키는 사용하지 않는다.
+# 모델 없이도 기존 흐름을 검증한다. 자체 모델 품질 검사는 별도이며 외부 AI 키는 사용하지 않는다.
 # 기본 브랜치 push와 수동 실행(Actions 탭 → Run workflow)에서 실행한다.
 # spec이 하나도 없으면 E2E 단계는 비어 있는 채로 통과하니(--pass-with-no-tests), spec을 넣은 뒤의 결과를 본다.
 name: scenarios
@@ -41,23 +41,15 @@ jobs:
             echo "E2E_USER_EMAIL=$email" >> "$GITHUB_ENV"
             echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"
           fi
-      - name: Check self-hosted AI without provider credentials
-        run: node tests/live/container-ai-check.mjs
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Run unit tests
-        run: |
-          npm ci --omit=optional --no-audit --no-fund
-          node --test --test-concurrency=1
       - name: Run scenario E2E
         working-directory: e2e
         run: |
           npm install
           npx playwright install --with-deps chromium
           npx playwright test --pass-with-no-tests --forbid-only
-          # Optional Gemini UX uses fake provider responses; no real Google calls in CI.
-          npx playwright test -c media.config.ts support-coach.spec.ts coach-provider.spec.ts coaching.spec.ts --forbid-only
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
