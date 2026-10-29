@@ -2,6 +2,8 @@
 
 기준일: 2026-10-30. 프롬프트 버전 `contextual-revision-v1`. 2026-10-30부터 `/studio.html`(다시봄 스튜디오)의 5단계 ‘대본 수정’에 연결했다(`public/js/studio-page.js`).
 
+기존 `/support-coach.html`의 연결도 유지한다. [기존 통합 화면 설명](supportive-coach.md#통합-화면2026-10-30-자체-ai-구간-대화와-한-화면).
+
 [구간 코칭](segment-coach-api.md)에서 사용자가 확인한 대본 위치와 그 구간에서 나눈 대화를 바탕으로, **대상 문단 하나만** 고친 수정안을 돌려준다. 예: “용어가 어려워서 설명하기 힘들었어요” → 그 용어를 풀어 쓴 말하기 쉬운 문단.
 
 - 질문·대화는 다시 만들지 않는다. `/api/coach/segment`의 `summary`·대화 이력을 받는다.

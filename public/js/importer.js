@@ -75,12 +75,12 @@ export function chunkSegments(chunk, resp) {
     const b = number(s?.endSecond ?? s?.end)
     const text = typeof s?.text === "string" ? s.text.trim() : ""
     if (text && Number.isFinite(a) && Number.isFinite(b) && a >= 0 && b >= a && b <= len + 1) {
-      out.push({ startSec: chunk.startSec + Math.min(a, len), endSec: chunk.startSec + Math.min(b, len), text })
+      out.push({ startSec: chunk.startSec + Math.min(a, len), endSec: chunk.startSec + Math.min(b, len), text, ...((s.timingPrecision === "chunk" || resp.timingPrecision === "chunk") ? { timingPrecision: "chunk" } : {}) })
     }
   }
   if (out.length) return out.sort((a, b) => a.startSec - b.startSec)
   const text = String(resp?.text || "").trim()
-  return text ? [{ startSec: chunk.startSec, endSec: chunk.endSec, text }] : []
+  return text ? [{ startSec: chunk.startSec, endSec: chunk.endSec, text, timingPrecision: "chunk" }] : []
 }
 
 /**

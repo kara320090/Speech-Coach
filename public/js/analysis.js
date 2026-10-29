@@ -128,6 +128,11 @@ export function analyzeTranscript(segments, durationSec) {
   }
   const overallRate = totalSyllables / (durationSec / 60)
 
+  // 조각 전체 시간은 단어 위치가 아니다. 전체 평균과 군말 집계만 제공하고 세부 속도·반복 위치는 만들지 않는다.
+  if (withText.some(s => s.timingPrecision === "chunk")) {
+    return { status: "ok", totalSyllables, overallRate, meanWindowRate: null, windows: [], items: [], fillers, timingPrecision: "chunk" }
+  }
+
   // 구간별 속도
   const numWin = Math.ceil(durationSec / SPEED_WINDOW_SEC)
   const windows = []
@@ -240,6 +245,10 @@ export function analyzeTranscript(segments, durationSec) {
 
 /** 인식된 글에서 군말 후보를 찾아 FILLER_GAP_SEC 안에 이어진 것끼리 묶는다. */
 export function analyzeFillers(segments) {
+  if (segments.some(s => s.timingPrecision === "chunk")) {
+    const summary = analyzeTranscriptFillers(segments, Math.max(0, ...segments.map(s => s.endSec)))
+    return { count: summary.count, times: [], items: summary.items.map(item => ({ ...item, timingPrecision: "chunk", basis: "전사 조각 전체의 추정 범위예요. 단어의 정확한 위치는 알 수 없어요. 재생해서 확인해 주세요." })), timingPrecision: "chunk" }
+  }
   const hits = []
   for (const s of segments) {
     const toks = tokenize(s.text)

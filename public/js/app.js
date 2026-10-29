@@ -414,7 +414,7 @@ function renderScript() {
     h("label", { class: "hint", for: "f-plan" }, "한 줄에 한 구간씩 '구간 이름 + 시간'을 적어요. 녹화 중 '다음 구간'을 누른 시점으로 계획과 비교해요."),
     plan,
     check("video", "웹캠 영상도 기록 (선택, 소리 기록 포함)", "끄면 카메라 미리보기와 시선 추적은 그대로 두고 소리만 기록해요."),
-    check("transcribe", "분석할 때 자체 AI로 음성 전사·군말·말하기 속도 분석", "분석 버튼을 누를 때 녹음 소리 조각만 직접 운영하는 서버로 보내요. Gemini와 브라우저 제공 업체의 음성 인식은 사용하지 않아요. 끄면 시간·침묵·시선만 분석해요."),
+    check("transcribe", "분석할 때 AI로 음성 전사·군말·말하기 속도 분석", "분석 버튼을 누를 때 녹음 소리 조각만 서버에 설정된 음성 인식(자체 AI 또는 주최 측 AI Gateway)으로 보내요. 브라우저 제공 업체의 음성 인식은 사용하지 않아요. 끄면 시간·침묵·시선만 분석해요."),
     h("p", { class: "info" }, "녹화 영상과 분석 결과는 이 브라우저에 저장해요. 영상·얼굴 데이터는 서버로 보내지 않아요."),
   )
   let body
@@ -1006,7 +1006,7 @@ function renderResults() {
       h("h2", null, "이 순간, 어떤 도움이 필요했나요?"),
       h("p", null, "대본과 관찰을 함께 보고 먼저 상황을 물어요. 쉬운 대본도 본인이 원할 때만 제안해요."),
       h("a", { class: "btn btn-secondary", href: `/support-coach.html?session=${encodeURIComponent(session.id)}${state.sel?.id ? `&item=${encodeURIComponent(state.sel.id)}` : ""}` }, "대본과 함께 AI 코칭"),
-      h("p", { class: "hint" }, "Gemini 3.8 Flash · 다음 화면에서 동의한 텍스트만 전송해요. 녹음·영상·얼굴은 전송하지 않아요.")),
+      h("p", { class: "hint" }, "검토 구간을 고르면 대본 위치를 먼저 확인해요. 기본은 자체 AI(외부 전송 없음)이고, 원하면 동의한 텍스트만 보내는 Gemini 대화를 고를 수 있어요. 녹음·영상·얼굴은 전송하지 않아요.")),
     ...measurementCards(session, { h, seek, onUpdated: () => { state.sel = null; renderResults() } }),
     transcriptCard,
     session.practiceOf ? null : compareHost,
@@ -1158,6 +1158,7 @@ function questionCard(session, hasMedia) {
         h("button", { type: "button", class: "btn btn-secondary", onclick: () => setStatus("문제 아님") }, "문제 아님"),
         hasMedia ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => seek(it.startSec) }, "다시 재생") : null,
       ),
+      h("a", { class: "btn btn-ghost", href: `/support-coach.html?session=${encodeURIComponent(session.id)}&item=${encodeURIComponent(it.id)}` }, "대본 위치 확인하고 AI와 이야기하기"),
     ]
   } else if (sel.step === 2) {
     const custom = h("input", { class: "input", "aria-label": "직접 입력", placeholder: "예: 슬라이드를 넘기다가 흐름을 놓쳤어요", value: sel.custom, oninput: (e) => (sel.custom = e.target.value) })

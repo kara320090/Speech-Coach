@@ -11,8 +11,7 @@ import { createSupportCoach } from "./server/support-coach.js"
 import { createContextualRevision, REVISION_LIMITS } from "./server/contextual-revision.js"
 
 import { CoachError, LIMITS } from "./server/local-coach.js"
-import { createCoach, createScriptGenerator } from "./server/coach-provider.js"
-import { createLocalTranscriber } from "./server/local-transcribe.js"
+import { createCoach, createScriptGenerator, createTranscriber, usesGateway } from "./server/coach-provider.js"
 import { createAgentBroker } from "./server/agent-broker.js"
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "public")
@@ -62,7 +61,8 @@ async function readBody(req, limit) {
 }
 
 export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits, runtime, agentPublicKey, healthReady = () => true } = {}) {
-  const agentMode = env.AI_EXECUTION_MODE === "agent" || env.RENDER === "true"
+  // Gateway 모드는 팀원 PC 에이전트 없이 주최 측 Gateway로 직접 호출한다.
+  const agentMode = !usesGateway(env) && (env.AI_EXECUTION_MODE === "agent" || env.RENDER === "true")
   const broker = agentMode ? createAgentBroker(agentPublicKey || JSON.parse(readFileSync(new URL("./server/agent-public-key.json", import.meta.url), "utf8")).publicKey) : null
   const inferenceEnv = broker ? { ...env, AI_PROVIDER: "local", LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
   const inferenceFetch = broker ? broker.fetch : fetchImpl
@@ -71,7 +71,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
   const segmentRevision = createContextualRevision({ coach })
   const generator = createScriptGenerator({ env, fetchImpl })
   const supportCoach = createSupportCoach({ env, fetchImpl })
-  const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
+  const transcriber = createTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const frontendOrigins = new Set(["https://speech-coach-public.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
   const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
   const alignScript = createScriptAlignHandler({ sendJson })
@@ -84,7 +84,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
       if (pathname === "/api/model-status") {
         if (req.method !== "GET") return sendJson(res, 405, { error: "method" })
         const managed = runtime?.snapshot() || broker?.snapshot()
-        return sendJson(res, 200, { ...await coach.status(), transcriptionConfigured: transcriber.configured, ...(managed && { runtime: managed }) })
+        return sendJson(res, 200, { ...await coach.status(), transcriptionConfigured: transcriber.configured, transcription: transcriber.status(), ...(managed && { runtime: managed }) })
       }
       if (pathname === "/api/scripts/generation-status") {
         if (req.method !== "GET") return sendJson(res, 405, { error: "method" })
