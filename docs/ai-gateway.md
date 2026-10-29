@@ -1,6 +1,6 @@
 # 주최 측 Vercel AI Gateway 공급자
 
-`AI_PROVIDER=gateway`일 때 서버의 모든 AI 호출을 주최 측 Vercel AI Gateway로 보낸다. 팀원 PC 에이전트·자체 모델·Google 직접 API에 의존하지 않는다. 기본값(`AI_PROVIDER` 미설정·`local`)의 동작은 바뀌지 않는다.
+`AI_PROVIDER=gateway`일 때 서버의 모든 AI 호출을 주최 측 Vercel AI Gateway로 보낸다. 팀원 PC 에이전트·자체 모델·Google 직접 API에 의존하지 않는다. Node 직접 실행의 기본값(`AI_PROVIDER` 미설정·`local`)은 유지한다. Docker Compose는 채점 환경을 위해 기본 공급자를 `gateway`로 지정한다.
 
 ## 참고한 공식 문서
 - OpenAI 호환 Chat Completions: https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions
@@ -23,7 +23,7 @@ API 요청·응답 계약은 그대로다. 전사 결과는 기존 `{ text, segm
 ## 설정
 | 환경변수 | 용도 |
 | --- | --- |
-| `AI_PROVIDER` | `gateway`로 두면 전환. 기본 `local` |
+| `AI_PROVIDER` | `gateway`로 두면 전환. Docker Compose 기본 `gateway`, Node 직접 실행 기본 `local` |
 | `AI_GATEWAY_API_KEY` | 주최 측이 준 키. **서버 환경변수에서만** 읽는다. 채팅·코드·Git·로그에 넣지 않는다 |
 | `AI_GATEWAY_TEXT_MODEL` | 기본 `google/gemini-3.8-flash` |
 | `AI_GATEWAY_TRANSCRIBE_MODEL` | 기본 `google/gemini-3.5-transcribe` |
@@ -32,7 +32,7 @@ API 요청·응답 계약은 그대로다. 전사 결과는 기존 `{ text, segm
 | `AI_MAX_REQUESTS_PER_MINUTE` / `_PER_DAY` / `_PER_CLIENT_PER_MINUTE` / `AI_MAX_CONCURRENT` | 기능별 호출량 상한(기본 10 / 200 / 4 / 2, 도움 대화 사용자별 6) |
 | `TRANSCRIBE_TOTAL_SECONDS` | Gateway 전사 누적 길이 상한. 코드 단독 기본 1800초, Docker Compose 기본 3600초(환경변수로 변경 가능) |
 
-Docker Compose: 셸이나 `.env`에 값을 두고 `AI_PROVIDER=gateway docker compose up --build`. 키는 compose 파일에 적지 않고 `${AI_GATEWAY_API_KEY}`로만 전달한다. Render 등 배포 서버는 대시보드 비밀 환경변수로 설정한다.
+Docker Compose: 주최 측이 `AI_GATEWAY_API_KEY`만 전달해도 `docker compose up --build`로 Gateway를 사용한다. 자체 모델이 필요한 개발자는 `AI_PROVIDER=local`로 명시한다. 키가 없으면 다른 모델로 우회하지 않고 AI 미설정 상태를 반환한다. 키는 compose 파일에 적지 않고 `${AI_GATEWAY_API_KEY}`로만 전달한다. Render 등 배포 서버는 대시보드 비밀 환경변수로 설정한다.
 
 ## 상태 확인
 `GET /api/model-status`(생성 요청 없음)는 기능별로 `provider: "ai-gateway"`, `model`, `keyConfigured`(키가 있음), `connection`(`unverified` → 실제 요청 성공 시 `verified`, 인증·크레딧·모델 오류 시 `failed`), 마지막 오류 코드, 누적 사용량(요청 수·토큰·전사 초)을 보여준다. 키 값·본문은 넣지 않는다. 키가 없으면 AI 기능은 "AI가 설정되지 않음" 안내를 돌려주고, 자료 저장·직접 수정·로컬 분석은 계속 쓸 수 있다.
