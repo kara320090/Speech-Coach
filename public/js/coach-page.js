@@ -167,7 +167,21 @@ $("export").onclick = () => {
 }
 $("restore").onclick = async () => {
   if (!state.versions.length) return
-  cancel(""); const original = state.versions[0]; $("script").value = original.script; $("sources").value = original.sources; syncDraft(); await persist(); $("revision").replaceChildren(); $("concept-list").replaceChildren(); renderHistory(); status("처음 저장한 자료를 새 버전으로 되돌렸어요. 이전 기록은 유지돼요.")
+  cancel("처음 대본을 새 버전으로 보관하고 있어요.")
+  const original = state.versions[0], versionId = id(), draftAnswer = $("answer").value
+  const restored = { ...structuredClone(state), script: original.script, sources: original.sources, versionId,
+    question: DEFAULT_QUESTION, concept: null, reference: "", helpUsed: false, followups: 0,
+    versions: [...state.versions, { id: versionId, script: original.script, sources: original.sources, createdAt: Date.now() }] }
+  $("restore").disabled = true; $("script").readOnly = true; $("sources").readOnly = true
+  try {
+    // Show the restored draft after its transaction completes, so an immediate reload keeps it.
+    saveQueue = saveQueue.catch(() => {}).then(() => saveWorkspace(restored))
+    const saved = await saveQueue
+    state = restored; $("script").value = original.script; $("sources").value = original.sources; resetPrompt()
+    $("answer").value = draftAnswer
+    $("revision").replaceChildren(); $("concept-list").replaceChildren(); renderHistory()
+    status(saved ? "처음 저장한 자료를 새 버전으로 되돌렸어요. 이전 기록은 유지돼요." : "원문을 현재 화면에만 보관 중이에요. 저장하지 못했으니 닫기 전에 내보내 주세요.")
+  } finally { $("restore").disabled = false; $("script").readOnly = false; $("sources").readOnly = false }
 }
 $("clear").onclick = async () => {
   if (!confirm("이 페이지에 저장한 대본·자료·답변 기록을 모두 삭제할까요? 기존 녹음 기록은 포함하지 않아요.")) return

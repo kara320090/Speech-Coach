@@ -57,7 +57,7 @@ jobs:
           npx playwright install --with-deps chromium
           npx playwright test --pass-with-no-tests --forbid-only
           # Optional Gemini UX uses fake provider responses; no real Google calls in CI.
-          npx playwright test -c media.config.ts support-coach.spec.ts coach-provider.spec.ts --forbid-only
+          npx playwright test -c media.config.ts support-coach.spec.ts coach-provider.spec.ts coaching.spec.ts --forbid-only
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
