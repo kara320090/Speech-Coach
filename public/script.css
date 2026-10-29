@@ -1,10 +1,5 @@
-/* 발표 대본: 준비 화면 파일 선택, 연습 화면 영상·대본 배치, 대본 영역. 공통 색·카드 규칙은 styles.css를 따른다. */
-input[type="file"] { font: inherit; max-width: 100%; }
-.stage { display: grid; gap: 16px; margin-top: 16px; }
-.stage .preview { width: 100%; max-width: none; margin-top: 0; }
-.stage[data-video="on"][data-script="off"] { max-width: 420px; }
-.script-view h2 { margin-bottom: 6px; }
-.script-text { white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; max-height: 60vh; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 1.05rem; line-height: 1.8; }
-@media (min-width: 760px) {
-  .stage[data-video="on"][data-script="on"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-}
+/* 대본 패널 '대본 편집' 모드의 TXT 불러오기 영역. 입력·안내·오류 모양은 styles.css의 공통 규칙을 따른다. */
+.script-import { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
+.script-import .hint, .script-import .errors, .script-import .notice { margin: 0; }
+.script-import .notice p { margin: 0 0 var(--space-2); }
+.script-import input[type="file"] { max-width: 100%; }

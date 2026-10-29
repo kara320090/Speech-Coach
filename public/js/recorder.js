@@ -35,6 +35,10 @@ function withTimeout(promise, ms) {
 }
 
 export class MediaCapture {
+  release() {
+    this.stream.getTracks().forEach((t) => t.stop())
+  }
+
   constructor(stream, status) {
     this.stream = stream
     this.status = status // { audio, video }
@@ -88,7 +92,12 @@ export class MediaCapture {
     return { capture: new MediaCapture(stream, status), notices, status }
   }
 
-  async start() {
+  /** recordVideo가 false면 웹캠이 켜져 있어도 소리만 기록한다. */
+  async start({ recordVideo = true } = {}) {
+    this.chunks = []
+    this.total = 0
+    this.vchunks = []
+    this.mr = null
     const AC = window.AudioContext || window.webkitAudioContext
     this.ctx = new AC()
     await this.ctx.resume()
@@ -111,7 +120,7 @@ export class MediaCapture {
     this.source.connect(this.proc)
     this.proc.connect(mute)
     mute.connect(this.ctx.destination)
-    if (this.stream.getVideoTracks().length && typeof MediaRecorder !== "undefined") {
+    if (recordVideo && this.stream.getVideoTracks().length && typeof MediaRecorder !== "undefined") {
       const type = ["video/webm;codecs=vp8,opus", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t))
       try {
         this.mr = new MediaRecorder(this.stream, type ? { mimeType: type } : undefined)
@@ -140,7 +149,8 @@ export class MediaCapture {
     if (this.mr?.state === "paused") this.mr.resume()
   }
 
-  async stop() {
+  /** keepStream이면 카메라·마이크를 끄지 않는다(미리보기를 계속 보여 주고 다음 녹화에 다시 쓴다). */
+  async stop({ keepStream = false } = {}) {
     this.recording = false
     let videoBlob = null
     if (this.mr && this.mr.state !== "inactive") {
@@ -157,7 +167,7 @@ export class MediaCapture {
     } catch {
       /* 이미 닫힘 */
     }
-    this.stream.getTracks().forEach((t) => t.stop())
+    if (!keepStream) this.release()
     const samples = concatFloat32(this.chunks)
     return { samples, sampleRate: TARGET_RATE, wavBlob: samples.length ? encodeWav(samples, TARGET_RATE) : null, videoBlob }
   }

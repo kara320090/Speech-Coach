@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
-  checkScriptFile, decodeScript, readScriptFile, scriptForPractice, sessionScript, SCRIPT_ERRORS, SCRIPT_MAX_BYTES,
+  checkScriptFile, decodeScript, readScriptFile, sessionScript, SCRIPT_ERRORS, SCRIPT_MAX_BYTES,
 } from "../public/js/script.js"
 
 // 개인정보 없는 가상 대본
@@ -58,19 +58,18 @@ test("파일 읽기에 실패하면 읽기 실패 안내를 준다", async () =>
   assert.deepEqual(await readScriptFile(broken), { ok: false, error: "read", message: SCRIPT_ERRORS.read })
 })
 
-test("scriptForPractice: 편집한 최종 글을 저장하고, 공백뿐이면 대본 없음으로 본다", () => {
+test("sessionScript: session.script와 따로 둔 파일명(scriptFile)을 꺼낸다", () => {
   const edited = `${SAMPLE}\n셋째, 마무리 인사입니다.`
-  assert.deepEqual(scriptForPractice(edited, "가상대본.txt"), { script: { text: edited, fileName: "가상대본.txt" }, error: null })
-  assert.deepEqual(scriptForPractice("직접 쓴 대본", ""), { script: { text: "직접 쓴 대본", fileName: null }, error: null })
-  assert.deepEqual(scriptForPractice("   \n ", "가상대본.txt"), { script: null, error: null })
-  assert.equal(scriptForPractice("a".repeat(SCRIPT_MAX_BYTES + 1)).error, SCRIPT_ERRORS.textSize)
+  assert.deepEqual(sessionScript({ script: edited, scriptFile: { name: "가상대본.txt", edited: true } }), { text: edited, fileName: "가상대본.txt" })
+  assert.deepEqual(sessionScript({ script: "직접 쓴 대본", scriptFile: null }), { text: "직접 쓴 대본", fileName: "" })
+  assert.deepEqual(sessionScript({ script: "" }), { text: "", fileName: "" })
 })
 
-test("sessionScript: 대본 기능 이전 기록(대본 없음)도 오류 없이 null을 준다", () => {
-  assert.equal(sessionScript({ settings: { targetSec: 60, raw: { tmin: "1" } } }), null)
-  assert.equal(sessionScript({ settings: { script: null } }), null)
-  assert.equal(sessionScript({}), null)
-  assert.equal(sessionScript(undefined), null)
-  const s = { text: SAMPLE, fileName: "가상대본.txt" }
-  assert.equal(sessionScript({ settings: { script: s } }), s)
+test("sessionScript: 대본·파일명이 없는 기존 기록도 오류 없이 대본 없음으로 본다", () => {
+  assert.deepEqual(sessionScript({ settings: { targetSec: 60, raw: { tmin: "1" } } }), { text: null, fileName: "" })
+  assert.deepEqual(sessionScript({ scriptFile: { name: "고아.txt" } }), { text: null, fileName: "" })
+  assert.deepEqual(sessionScript({ script: "글", scriptFile: { name: 3 } }), { text: "글", fileName: "" })
+  assert.deepEqual(sessionScript({}), { text: null, fileName: "" })
+  assert.deepEqual(sessionScript(undefined), { text: null, fileName: "" })
+  assert.deepEqual(sessionScript(null), { text: null, fileName: "" })
 })

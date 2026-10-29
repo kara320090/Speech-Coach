@@ -8,7 +8,6 @@ export const SCRIPT_ERRORS = {
   empty: "파일에 글자가 없어요. 빈 파일이거나 공백뿐인 파일이에요.",
   encoding: "UTF-8로 저장된 TXT 파일만 읽을 수 있어요. 메모장 등에서 '다른 이름으로 저장' → 인코딩 UTF-8로 저장한 뒤 다시 골라 주세요.",
   read: "파일을 읽지 못했어요. 파일이 옮겨졌거나 열 수 없는 상태인지 확인하고 다시 골라 주세요.",
-  textSize: "대본이 1MB보다 길어요. 연습에 쓸 부분만 남겨 주세요.",
 }
 
 /** 파일을 읽기 전에 이름·형식·크기를 확인한다. 문제가 없으면 null. */
@@ -54,16 +53,13 @@ export async function readScriptFile(file) {
   return r.ok ? r : { ...r, message: SCRIPT_ERRORS[r.error] }
 }
 
-/** 연습 시작 시 기록에 남길 대본. 공백뿐이면 대본 없음(null). */
-export function scriptForPractice(text, fileName) {
-  const t = normalizeScript(text)
-  if (!t.trim()) return { script: null, error: null }
-  if (new TextEncoder().encode(t).length > SCRIPT_MAX_BYTES) return { script: null, error: SCRIPT_ERRORS.textSize }
-  return { script: { text: t, fileName: fileName || null }, error: null }
-}
-
-/** 기록에서 대본을 꺼낸다. 대본 기능 이전 기록이면 null. */
+/**
+ * 기록(session)에서 대본과 불러온 파일명을 꺼낸다.
+ * 대본 글은 session.script(문자열), 파일명은 따로 둔 session.scriptFile.name에 있다.
+ * 대본이 없거나 파일 정보가 없는 기존 기록이면 text는 null, fileName은 ""이다.
+ */
 export function sessionScript(session) {
-  const s = session?.settings?.script
-  return s && typeof s.text === "string" && s.text.trim() ? s : null
+  const text = typeof session?.script === "string" ? session.script : null
+  const name = session?.scriptFile?.name
+  return { text, fileName: text !== null && typeof name === "string" ? name : "" }
 }

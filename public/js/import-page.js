@@ -1,6 +1,6 @@
 // 영상·소리 파일 불러오기 화면. 파일에서 소리만 꺼내 긴 침묵을 찾고, 원하면 글자로도 바꿔 연습 결과 화면(#/result/ID)으로 넘긴다.
 import { TARGET_RATE, encodeWav } from "./wav.js"
-import { analyzeSilence, analyzeTranscript, buildReviewItems, classifyResult, conditionKey } from "./analysis.js"
+import { analyzeFillers, analyzeSilence, analyzeTranscript, buildReviewItems, classifyResult, conditionKey } from "./analysis.js"
 import { decodeToMono16k, planChunks, transcribeChunks, MAX_FILE_BYTES } from "./importer.js"
 import { saveSession } from "./storage.js"
 
@@ -93,7 +93,7 @@ function renderForm() {
       ),
     ),
     errors,
-    h("button", { type: "submit", class: "primary" }, "분석 시작"),
+    h("button", { type: "submit", class: "btn btn-primary" }, "분석 시작"),
   )
   form.addEventListener("submit", (ev) => {
     ev.preventDefault()
@@ -167,7 +167,8 @@ async function run(file, input) {
     }
   }
 
-  const items = buildReviewItems({ silence, transcript, sectionRows: [], toleranceSec: input.tol })
+  const fillers = speechState === "ok" ? analyzeFillers(segments) : null
+  const items = buildReviewItems({ silence, transcript, sectionRows: [], toleranceSec: input.tol, fillers })
   const result = classifyResult(total, input.targetSec, input.tol)
   const isVideo = file.type.startsWith("video/")
   const settings = {
@@ -186,7 +187,7 @@ async function run(file, input) {
     marks: [],
     sectionRows: [],
     media: { audio: "ok", video: isVideo ? "ok" : "off", speech: speechState, speechDetail: "" },
-    analysis: { silence: { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio }, transcript, items },
+    analysis: { silence: { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio }, transcript, fillers: fillers && { count: fillers.count, times: fillers.times }, gaze: { status: "off" }, items },
     transcript: segments,
     audioBlob: encodeWav(samples, TARGET_RATE),
     videoBlob: isVideo ? file : null,
