@@ -3,7 +3,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { createServer } from "../server.js"
 import { createCoach, createScriptGenerator } from "../server/coach-provider.js"
-import { classifyGeminiError, createGeminiClient, parseGeminiResponse, retryAfterSeconds } from "../server/gemini-client.js"
+import { checkModelAccess, classifyGeminiError, createGeminiClient, parseGeminiResponse, providerDetail, retryAfterSeconds, thinkingConfigFor } from "../server/gemini-client.js"
 import { workspaceWithGeneratedDraft } from "../public/js/draft-workspace.js"
 
 const KEY = "fake-unit-test-only"
@@ -195,4 +195,44 @@ test("applying a reviewed generated draft preserves original versions and answer
   assert.equal(next.attempts[0].id, "answer"); assert.equal(next.concept, null); assert.equal(next.script, OUT.script)
   assert.equal(before.versions.length, 0)
   assert.throws(() => workspaceWithGeneratedDraft(null, { script: "", sources: "" }, "x", 1))
+})
+
+test("thinking configuration covers Flash 2.5, all 3.x forms and leaves Pro defaults unchanged", async () => {
+  for (const model of ["gemini-2.5-flash", "gemini-2.5-flash-lite"]) assert.deepEqual(thinkingConfigFor(model), { thinkingBudget: 0 })
+  for (const model of ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"]) assert.deepEqual(thinkingConfigFor(model), { thinkingLevel: "low" })
+  assert.equal(thinkingConfigFor("gemini-2.5-pro"), undefined)
+  const f = fake(); await generator(f, { GEMINI_MODEL: "gemini-2.5-pro" }).run(sample(), signal())
+  assert.equal(JSON.parse(f.calls[0].init.body).generationConfig.thinkingConfig, undefined)
+})
+
+test("provider detail permits only HTTP status and uppercase enum codes", () => {
+  assert.deepEqual(providerDetail(404, { error: { status: "NOT_FOUND", message: KEY } }), { httpStatus: 404, providerStatus: "NOT_FOUND", providerReason: null })
+  assert.deepEqual(providerDetail(400, { error: { status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID", metadata: { key: KEY } }] } }), { httpStatus: 400, providerStatus: "INVALID_ARGUMENT", providerReason: "API_KEY_INVALID" })
+  assert.deepEqual(providerDetail(500, { error: { status: "not an enum <script>", details: [{ reason: `project 123 ${KEY}` }] } }), { httpStatus: 500, providerStatus: null, providerReason: null })
+  assert.deepEqual(providerDetail(502, null), { httpStatus: 502, providerStatus: null, providerReason: null })
+})
+
+test("generation status retains safe lastError without raw messages or topic and clears it on success", async () => {
+  const f = fake(() => err(404, { status: "NOT_FOUND", message: `is not found ${KEY}` }))
+  await withServer({}, f, async base => {
+    await post(base, sample({ topic: "비공개 가상 주제입니다" }))
+    const raw = await (await fetch(base + "/api/scripts/generation-status")).text(), state = JSON.parse(raw)
+    assert.deepEqual(Object.keys(state.lastError).sort(), ["at", "code", "hint", "httpStatus", "providerReason", "providerStatus"])
+    assert.equal(state.lastError.httpStatus, 404); assert.equal(state.lastError.providerStatus, "NOT_FOUND")
+    assert.match(state.lastError.hint, /gemini:check-models/)
+    for (const leak of [KEY, "is not found", "비공개 가상 주제입니다", sample().sources]) assert.ok(!raw.includes(leak))
+  })
+  const g = generator(fake(n => n === 1 ? err(503, { status: "UNAVAILABLE" }) : ok()))
+  await assert.rejects(g.run(sample(), signal()), { code: "provider-unavailable" })
+  assert.equal((await g.status()).lastError.providerStatus, "UNAVAILABLE")
+  await g.run(sample({ requestId: "r2" }), signal()); assert.equal((await g.status()).lastError, null)
+})
+
+test("model access checks use authenticated GET only and do not claim generation success", async () => {
+  const f = fake((_, url) => url.endsWith("/models/gemini-3.8-flash") ? new Response(JSON.stringify({ supportedGenerationMethods: ["generateContent"] })) : err(404, { status: "NOT_FOUND", message: KEY }))
+  const yes = await checkModelAccess({ apiKey: KEY, model: "gemini-3.8-flash", fetchImpl: f })
+  assert.deepEqual(yes, { model: "gemini-3.8-flash", httpStatus: 200, providerStatus: null, providerReason: null, accessible: true, generateContent: true })
+  const no = await checkModelAccess({ apiKey: KEY, model: "gemini-2.5-flash", fetchImpl: f }); assert.equal(no.accessible, false)
+  for (const call of f.calls) { assert.equal(call.init.method, "GET"); assert.equal(call.init.body, undefined); assert.ok(!call.url.includes(KEY)); assert.equal(call.init.headers["x-goog-api-key"], KEY) }
+  await assert.rejects(checkModelAccess({ apiKey: KEY, model: "../x", fetchImpl: f }))
 })

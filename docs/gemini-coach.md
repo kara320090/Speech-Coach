@@ -35,3 +35,7 @@ Render는 `AI_EXECUTION_MODE=agent`로 운영 PC의 서명된 에이전트와 �
 `tests/gemini-coach.test.mjs`: 생성 전용 입력·오류·한도·중복·취소·기존 대본 보존, Gemini 실패 후에도 4개 코칭 과업의 자체 처리. `tests/agent.test.mjs`: 서명된 PC 연결과 Google 호출 없는 실제 전송 경로. `e2e/media/coach-provider.spec.ts`: 생성→확인→버전 보존→자체 코칭 이동과 생성 실패 시 연습 유지. 기본 검사·CI는 실제 Google API를 호출하지 않는다.
 
 수동 실제 생성 확인은 서버 환경에 키를 설정하고 `GEMINI_LIVE_TEST=1 npm run test:gemini-live`로 실행한다. 입력은 개인정보 없는 가상 주제·자료다. 사용량은 Google 프로젝트에 기록될 수 있다. 데이터 처리 조건은 [Google Gemini API 약관](https://ai.google.dev/gemini-api/terms)을 따른다.
+
+## 모델 진단
+
+`npm run gemini:check-models`는 models.get으로 모델 정보 접근 여부만 확인하며 생성하지 않는다. 정보 조회 성공은 실제 대본 생성 성공·무료 사용 가능을 보장하지 않는다. 생성 상태 API의 lastError에는 코드·HTTP 상태·Google 열거 코드·시간·안내만 남기며 원문 메시지·키·프로젝트·입력은 넣지 않는다. 성공하면 지운다. 진단은 생성 서비스 상태에서 확인하고 자체 AI 코칭과 구분한다.

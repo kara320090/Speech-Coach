@@ -4,7 +4,7 @@
 
 - 사용자 지정: 새 대본만 Gemini 3.8 Flash, 분석·쉬운 표현 수정·질문·답변 검토는 Qwen, 음성 전사는 faster-whisper. 기존 AI_PROVIDER 값과 관계없이 이 역할을 적용한다.
 - `/create-script.html`·`/api/scripts/generate`·생성 상태를 추가하고, 사용자 확인 후 원본·답변 이력을 보존한 새 버전으로 자체 AI 연습에 연결했다. F22와 정의·분석·기획·화면·추적 문서를 맞췄다.
-- 확인: Node 22 단위 138개, 기본 S1–S4·S9 5개, 생성·코칭 브라우저 9개 통과. 가짜 Gemini 실패 뒤에도 네 과업의 자체 모델 처리, 외부 자동 대체 없음, 서명된 에이전트 연결, 취소·한도·원본 보존을 검사했다. 기본 검사에서 실제 Google API는 호출하지 않았다.
+- 확인: 최신 모델 진단·호환성 검사 포함 Node 22 단위 142개, 기본 S1–S4·S9 5개, 생성·코칭 브라우저 9개 통과. 가짜 Gemini 실패 뒤에도 네 과업의 자체 모델 처리, 외부 자동 대체 없음, 서명된 에이전트 연결, 취소·한도·원본 보존을 검사했다. 기본 검사에서 실제 Google API는 호출하지 않았다.
 - 실제 공개 사이트·운영 PC 모델 연결과 실제 Gemini 생성 결과는 배포 후 검사에서 구분해 기록한다. 실제 사람 얼굴·음성 정확도와 학습 효과 검증은 별도다.
 
 
@@ -207,3 +207,16 @@
 - 확인한 것: `node --test` 118개 통과(새 16개, 가짜 Gemini 응답만, 실제 API 호출 차단). E2E `coach-provider.spec.ts` 2개 통과.
 - 기존 문제(이번 변경과 무관): `e2e/media/coaching.spec.ts` 2개(rewrite 복원 문구, feedback cap 표시)가 main(`c283d1d`)에서도 같은 이유로 실패한다. 프론트 담당 확인 필요.
 - 확인하지 못한 것: 실제 Gemini 연결(키 미설정, 지시에 따라 미실행), Render 배포, 실제 응답의 스키마 수용·품질.
+
+## 19. Gemini `provider-model` 진단과 모델 접근 점검 (브랜치 `feat/gemini-diagnostics`, 모델 변경 전)
+
+- 배경(2026-10-30): 배포 프론트(https://speech-coach-public.vercel.app → Render)의 `/api/model-status`가 `connection: failed`, `reason: provider-model`(Google HTTP 404), `keyConfigured: true`. 호출 주소·버전·방식(`v1beta/models/gemini-2.5-flash:generateContent`, `x-goog-api-key`)은 공식 레퍼런스와 같다. Google 모델 문서는 2.5 모델 접근을 과거 사용자로 제한한다고 밝혀 가장 유력한 원인이지만, 키로 확인하기 전까지는 확정하지 않는다.
+- 조치: Google 오류의 HTTP 상태·열거 코드만 남기는 `providerDetail`, 상태 API `lastError`(정제 코드·안내만, 원문 메시지·키·요청 내용 없음), 생성 없는 `npm run gemini:check-models`(models.get). 모델·결제·생성 호출은 바꾸지 않았다.
+- 확인한 것: `node --test` 139개 통과(새 3개). 가짜 키를 넣고 전체 검사를 돌려도 Google 요청 0건(네트워크 감시). 키 없이 점검 명령을 실행하면 외부 요청 없이 끝남.
+- 남은 것: 사용자가 실제 키로 `npm run gemini:check-models gemini-2.5-flash gemini-3.8-flash gemini-3.5-flash-lite`를 실행해 결과 확인, 모델 결정.
+
+## 20. Gemini 3 생각 설정 호환성 수정 (브랜치 `fix/gemini-thinking-config`)
+
+- 배경(2026-10-30): 배포에서 `gemini-3.8-flash`로 '쉬운 대본 제안' 1회 실행 → "Gemini 서비스가 일시적으로 응답하지 않아요." 코드상 이 문구는 Google HTTP 5xx(504 제외)일 때만 나온다(우리 응답 503 `provider-unavailable`). 네트워크·시간 초과·응답 처리 문제는 아니다. 500/503 중 무엇인지는 당시 배포(`8b1ddd1`)에 진단 정보가 없어 미확인. PR #9(진단 `lastError`)는 CI 통과 후 병합(`0675a4e`).
+- 확인: `gemini-3.8-flash` 공식 모델 페이지는 thinking level low·medium·high만 지원하고 minimal(생각 끄기)은 오류라고 밝힌다. 기존 요청의 `thinkingBudget: 0`(생각 끄기)은 이와 맞지 않아 계열별 설정으로 바꿨다(2.5 Flash `thinkingBudget: 0`, 3.x `thinkingLevel: "low"`, 그 밖 미전송). 빈 문자열 enum은 공식 문서에 금지 문장이 없어 유지. temperature 1.0 권장은 비호환이 아니라 권장이라 유지하고 문서에 기록.
+- 확인한 것: `node --test` 140개 통과(새 1개). 네트워크 감시로 Google 요청 0건. 이 수정이 이번 5xx의 원인이었는지는 실제 재시험 전까지 단정하지 않는다.

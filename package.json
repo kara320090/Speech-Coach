@@ -11,7 +11,8 @@
     "ai:pair": "node local-ai/pair-agent.mjs",
     "start:agent": "node --env-file-if-exists=.env local-ai/agent.mjs",
     "test": "node --test",
-    "test:gemini-live": "node tests/live/gemini-live-check.mjs"
+    "test:gemini-live": "node tests/live/gemini-live-check.mjs",
+    "gemini:check-models": "node tests/live/gemini-model-check.mjs"
   },
   "engines": {
     "node": "22.x"
