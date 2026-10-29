@@ -4,7 +4,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { createServer } from "../server.js"
 import { createCoach } from "../server/coach-provider.js"
-import { checkModelAccess, classifyGeminiError, createGeminiClient, parseGeminiResponse, providerDetail, retryAfterSeconds } from "../server/gemini-client.js"
+import { checkModelAccess, classifyGeminiError, createGeminiClient, parseGeminiResponse, providerDetail, retryAfterSeconds, thinkingConfigFor } from "../server/gemini-client.js"
 
 // 기본 검사 중에는 진짜 네트워크로 Google을 부르지 못하게 막는다(키가 환경에 있어도).
 const realFetch = globalThis.fetch
@@ -83,6 +83,26 @@ test("요청 형식: generateContent 주소·x-goog-api-key 머리·systemInstru
   assert.ok(body.generationConfig.responseJsonSchema.properties.referenceQuote.enum.includes("결과를 5분 동안 저장한다."), "인용은 입력 문장 목록으로 제한한다")
   assert.equal(body.generationConfig.maxOutputTokens, 2048)
   assert.equal(body.generationConfig.thinkingConfig.thinkingBudget, 0)
+})
+
+test("생각 설정은 모델 계열에 맞춘다: 2.5 Flash는 thinkingBudget 0, 3.x는 thinkingLevel low(생각 끄기 미지원), 그 밖은 보내지 않음", async () => {
+  assert.deepEqual(thinkingConfigFor("gemini-2.5-flash"), { thinkingBudget: 0 })
+  assert.deepEqual(thinkingConfigFor("gemini-2.5-flash-lite"), { thinkingBudget: 0 })
+  assert.deepEqual(thinkingConfigFor("gemini-3.8-flash"), { thinkingLevel: "low" })
+  assert.deepEqual(thinkingConfigFor("gemini-3.5-flash-lite"), { thinkingLevel: "low" })
+  assert.equal(thinkingConfigFor("gemini-2.5-pro"), undefined)
+  const body = async (model) => {
+    const f = fakeFetch(() => geminiOk({ ...OUT.rewrite, sourceQuote: "" }))
+    await createCoach({ env: env({ GEMINI_MODEL: model }), fetchImpl: f }).run(sample({ task: "rewrite", sources: "" }), signal())
+    return JSON.parse(f.calls[0].init.body).generationConfig
+  }
+  const g38 = await body("gemini-3.8-flash")
+  assert.deepEqual(g38.thinkingConfig, { thinkingLevel: "low" })
+  assert.ok(!("thinkingBudget" in g38.thinkingConfig), "thinkingLevel과 thinkingBudget을 함께 보내지 않는다")
+  // 근거 자료가 없을 때의 인용 칸은 빈 문자열 하나만 허용한다(서버 검증과 같은 규칙)
+  assert.deepEqual(g38.responseJsonSchema.properties.sourceQuote, { type: "string", enum: [""] })
+  assert.equal((await body("gemini-2.5-pro")).thinkingConfig, undefined)
+  assert.deepEqual((await body("gemini-2.5-flash")).thinkingConfig, { thinkingBudget: 0 })
 })
 
 test("네 과업(개념·대본 수정·질문·답변 검토)이 /api/coach의 기존 응답 형식으로 돌아온다", async () => {
