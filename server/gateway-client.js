@@ -77,7 +77,10 @@ export function gatewaySchema(schema, model) {
   if (!model.startsWith("google/")) return copy
   const visit = (node) => {
     if (!node || typeof node !== "object") return
-    if (Array.isArray(node.enum) && node.enum.includes("")) delete node.enum
+    if (Array.isArray(node.enum) && node.enum.includes("")) {
+      if (node.enum.length === 1) node.description = 'No source material was supplied. Return the empty string "". Do not quote the script or surrounding context.'
+      delete node.enum
+    }
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) value.forEach(visit)
       else visit(value)
