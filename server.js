@@ -62,7 +62,8 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
   const broker = agentMode ? createAgentBroker(agentPublicKey || JSON.parse(readFileSync(new URL("./server/agent-public-key.json", import.meta.url), "utf8")).publicKey) : null
   const inferenceEnv = broker ? { ...env, AI_PROVIDER: "local", LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
   const inferenceFetch = broker ? broker.fetch : fetchImpl
-  const coach = createCoach({ env: inferenceEnv, fetchImpl: inferenceFetch })
+  const geminiSelected = String(env.AI_PROVIDER || "local").trim().toLowerCase() === "gemini"
+  const coach = createCoach({ env: geminiSelected ? env : inferenceEnv, fetchImpl: geminiSelected ? fetchImpl : inferenceFetch })
   const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const frontendOrigins = new Set(["https://speech-coach-public.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
   const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })

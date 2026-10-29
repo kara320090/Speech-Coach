@@ -78,6 +78,16 @@ test("agent permits HTTPS backend and loopback development targets only",()=>{
   assert.equal(backendUrl('https://example.com'),'https://example.com')
   for(const value of ['http://example.com','https://u:p@example.com','https://example.com/path','https://example.com/?key=x'])assert.throws(()=>backendUrl(value))
 })
+test("explicit Gemini selection on Render keeps text provider independent from the voice agent",async()=>{
+  const keys=pair();let calls=0
+  const server=createServer({env:{RENDER:'true',AI_PROVIDER:'gemini',GEMINI_MODEL:'gemini-2.5-flash',GEMINI_API_KEY:'fake-unit-test-only'},agentPublicKey:keys.publicKey,fetchImpl:async()=>{calls++;throw Error('unexpected')}})
+  const origin=await serve(server)
+  try{
+    const state=await(await fetch(origin+'/api/model-status')).json()
+    assert.equal(state.provider,'gemini');assert.equal(state.model,'gemini-2.5-flash');assert.equal(state.keyConfigured,true);assert.equal(calls,0)
+    assert.equal(state.runtime.mode,'self-hosted-agent')
+  }finally{await close(server)}
+})
 test("backend-to-agent-to-loopback inference works without provider APIs",async()=>{
   const keys=pair(),model=http.createServer(async(req,res)=>{
     const chunks=[];for await(const chunk of req)chunks.push(chunk)

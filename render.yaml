@@ -16,3 +16,9 @@ services:
         value: "22"
       - key: AI_EXECUTION_MODE
         value: agent
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_API_KEY
+        sync: false
