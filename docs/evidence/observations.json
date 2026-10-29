@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-29",
+  "kind": "관찰 내용을 정리한 기록이며 원본 도구 로그 파일은 아님",
+  "pt": {
+    "source": "https://ptsandbag.kr/practice/",
+    "input": "가상의 2장 대본, 전체 시간 1분에서 2분 변경, 균등 배분",
+    "observed": "구간 30초에서 60초, 대본 유지. 녹음 없이 타이머 종료 약27초/목표2분,22/100 표시.",
+    "limits": "유료 AI 실행 안 함, 음성 품질 시험 아님"
+  },
+  "saynow": {
+    "source": "https://saynow.ai/tools/elevator-pitch-generator",
+    "input": {
+      "who": "a university student working on a classroom presentation project",
+      "target": "a summer internship where I can test educational software with students",
+      "what": "turning student interviews into simple prototypes, writing test cases, organizing feedback, and explaining what the team should build next",
+      "proof": "in a fictional class project, our four person team built a prototype, tested three workflows, collected feedback from classmates, identified confusing labels, revised the design twice, and documented the remaining limitations without claiming that the prototype had already improved learning outcomes",
+      "ask": "show you the prototype and discuss how I could help your team evaluate its next educational product",
+      "detail": ""
+    },
+    "observed_30": "114 words · about 49 seconds at 140 words per minute · too long for 30 seconds, so shorten your answers",
+    "observed_60": "162 words · about 69 seconds at 140 words per minute · too long for 60 seconds, so shorten your answers",
+    "limits": "예상치. 실제 발화·한국어·모바일 앱 시험 아님"
+  }
+}
