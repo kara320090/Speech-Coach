@@ -28,7 +28,7 @@
 - `POST /api/coach/support`: `support-start`, `support-answer`, `support-rewrite`. 대본·자료 각각 2,400자, 상황 600자, 관찰 8개·각 300자, 순서가 맞는 대화 최대 7항목·각 1,600자, 본문 64KiB. 요청·대본 버전 ID를 확인한다.
 - 모든 실행에 `externalTransferConsent: true`, 수정에 `rewriteConsent: true`와 앞선 본인 답변을 요구한다. 공개 API의 동의 필드는 사용자 신원 인증을 뜻하지 않는다.
 - 허용된 텍스트만 Google Gemini로 전송한다. 음성·영상·얼굴·API 키는 브라우저 요청 본문에 포함하지 않는다. 키는 기존 서버 `GEMINI_API_KEY`, 모델은 `GEMINI_MODEL`(기본 `gemini-3.8-flash`)이다.
-- 기존 Gemini 클라이언트·출력 크기·시간 제한·취소·오류 분류·동시 처리·메모리 호출량 제한을 재사용한다. 지원 대화의 기본 기기별 분당 한도는 6회다. 각 서비스의 제한은 별도이고, 재시작·다중 인스턴스의 합산 예산을 보장하지 않는다.
+- 기존 Gemini 클라이언트·출력 크기·취소·오류 분류·동시 처리·메모리 호출량 제한을 재사용한다. 도움 대화의 `SUPPORT_GEMINI_TIMEOUT_MS`는 기본 105초·최대 110초로, [Vercel 외부 프록시의 120초 한도](https://vercel.com/docs/limits#proxied-request-timeout) 안에서 오류 응답 시간을 남긴다. 새 대본의 55초 설정과 분리한다. 지원 대화의 기본 기기별 분당 한도는 6회다. 각 서비스의 제한은 별도이고, 재시작·다중 인스턴스의 합산 예산을 보장하지 않는다.
 - 대화는 해당 탭의 sessionStorage, 적용한 대본 버전은 브라우저 IndexedDB, 다음 연습 설정과 직전 되돌리기는 localStorage에 둔다. 서버는 대화·대본·음성을 파일·DB·본문 로그로 저장하지 않는다. Google 측 처리는 해당 API 조건을 따른다.
 - 키 없음·모델 접근 오류·한도·시간 초과·잘못된 출력·취소에도 원문·입력 답변을 유지한다. 모델 결과를 다른 AI나 규칙 응답으로 속여 대체하지 않는다. 기본 녹화·자체 AI는 별도다.
 
@@ -37,3 +37,5 @@
 `tests/support-coach.test.mjs`: 전송 동의·수정 허락·질문 상한·거절·원문/수치 보존·긴 대본·부정적 판정 차단·근거 인용·오류·API 경계. `e2e/media/support-coach.spec.ts`: 결과에서 진입·처음 질문·본인 답변·허락 후 생성·확인 후 적용·이전 녹음 보존·되돌리기·취소·키 없음. 브라우저 검사는 가짜 공급자 응답과 장치를 쓰므로 실제 Gemini 품질·학습 효과 증거와 구분한다.
 
 키가 필요한 선택 기능이므로 제출 8개 기본 시나리오에 필수로 넣지 않는다. 기존 무키·무장치 Docker 흐름과 자체 모델 검사를 유지한다. 실제 공개 Gemini 호출 결과는 `progress.md`에 별도로 기록한다.
+
+Gemini 3.8은 지원되는 low thinking을 사용하며, [공식 마이그레이션 안내](https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.8)에 따라 3.6+ 모델에는 폐기 예정인 sampling 인자를 보내지 않는다. 모델·과금 등급을 자동 변경하거나 생성 요청을 자동 반복하지 않는다.

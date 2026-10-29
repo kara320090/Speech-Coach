@@ -69,7 +69,8 @@ export function createSupportCoach({ env = {}, fetchImpl = fetch, now } = {}) {
   const info = { provider: "gemini", model, processing: "external:google-gemini", keyConfigured: Boolean(apiKey), processingNotice: "동의하고 함께 살펴보기를 누르면 선택한 대본·근거·관찰 텍스트·이 대화의 답변을 Google Gemini로 보내요. 녹음·영상·얼굴은 보내지 않아요." }
   let client = null
   if (!apiKey) info.configError = { reason: "not-configured", message: "대화 코칭용 Gemini 키가 준비되지 않았어요. 기존 자체 AI 이해 연습과 녹화 분석은 계속 사용할 수 있어요." }
-  else try { client = createGeminiClient({ apiKey, model, timeoutMs: Math.min(60000, Math.max(5000, Number(env.GEMINI_TIMEOUT_MS) || 55000)), fetchImpl }) }
+  // Stay below Vercel's 120s external rewrite deadline, with time left for validation/response.
+  else try { client = createGeminiClient({ apiKey, model, timeoutMs: Math.min(110000, Math.max(5000, Number(env.SUPPORT_GEMINI_TIMEOUT_MS) || 105000)), fetchImpl }) }
   catch { info.configError = { reason: "invalid-model", message: "대화 코칭의 Gemini 모델 설정을 확인해 주세요." } }
   return createRemoteCoach({ client, info, limits: remoteLimits({ ...env, AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE: env.AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE || 6 }), spec: supportSpec, promptVersion: SUPPORT_PROMPT_VERSION, ...(now && { now }) })
 }

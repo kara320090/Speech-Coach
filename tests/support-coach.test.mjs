@@ -41,6 +41,7 @@ test("start asks before offering changes; answer and explicit rewrite use only r
   assert.equal(result.result.rewritten, draft); assert.equal(result.result.blocked, false)
   assert.equal(f.calls.length, 3)
   assert.ok(f.calls.every(c => c.url.endsWith("/models/gemini-3.8-flash:generateContent")))
+  assert.ok(f.calls.every(c => !Object.hasOwn(JSON.parse(c.options.body).generationConfig, "temperature")))
   const text = JSON.stringify(JSON.parse(f.calls[0].options.body))
   assert.match(text, /원인을|추정하거나/); assert.match(text, /이해 부족/)
   assert.ok(!JSON.stringify(result).includes("unit-test-key"))

@@ -39,6 +39,7 @@ test("Gemini accepts only a new topic and sources; uses 3.8 thinking level and b
   assert.deepEqual(body.generationConfig.responseJsonSchema.required, ["title", "script", "notes"])
   assert.deepEqual(body.generationConfig.thinkingConfig, { thinkingLevel: "low" })
   assert.equal(body.generationConfig.maxOutputTokens, 2048)
+  assert.equal(Object.hasOwn(body.generationConfig, "temperature"), false)
   assert.equal(out.result.humanReview, "unreviewed"); assert.equal(out.result.evidenceStatus, "provided-material-only")
 })
 

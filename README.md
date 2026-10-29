@@ -66,6 +66,7 @@ npm start
 | `LOCAL_AI_TIMEOUT_MS` | 기본 90초, 최대 180초. 동시 코칭 요청은 1개 |
 | `LOCAL_STT_URL` | 같은 호스트 전사 worker 주소, 예 `http://127.0.0.1:8081` |
 | `TRANSCRIBE_TOTAL_SECONDS` | 서버 실행 중 누적 전사 길이, 기본 3600초 |
+| `SUPPORT_GEMINI_TIMEOUT_MS` | 선택한 도움 대화만 기본 105초·최대 110초. 기다리는 중 취소 가능 |
 | `AI_PROVIDER` | 호환 설정 `local`. 코칭은 이 값과 관계없이 자체 모델만 사용 |
 | `GEMINI_MODEL`, `GEMINI_API_KEY` | 새 대본·동의한 상황 대화 모델(기본 `gemini-3.8-flash`)과 키. 서버 환경변수에서만 읽음. [생성 설정](docs/gemini-coach.md) |
 
