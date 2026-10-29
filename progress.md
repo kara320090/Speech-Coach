@@ -272,3 +272,17 @@
 - 비교·통합: 두 흐름 모두 '검토 구간 → 대화 → 쉬운 대본 → 비교·적용 → 다음 연습'이라 `support-coach.html` 하나로 합쳤다. 위치 확인(align)을 앞에 두고, 대화 AI를 자체 AI(기본, segment·revise-segment)와 Gemini(기존 support, 동의 필요) 중 고르게 했다. 비교·보존 확인·적용·되돌리기는 기존 코드를 그대로 쓴다. 결과 질문 카드에 진입 링크 추가. 백엔드 변경 없음.
 - 파일: `public/js/segment-flow.js`(API 호출·형식 변환·적용 전 확인), `public/js/support-page.js`, `public/support-coach.html`, `public/support.css`, `public/js/support-state.js`(버전 출처 이름), `public/js/app.js`(진입 링크·안내 문구).
 - 확인한 것: `node --test` 213개 통과(새 4개). E2E 새 4개 + 기존 support-coach 4개 통과(위치 추천·규칙 대화는 실제 로컬 서버, 문단 수정 모델 응답만 가짜). 로컬 화면 스크린샷 확인. 로컬에서 S5–S7(실제 모델 필요)·coaching.spec 1개 실패는 수정 전 main에서도 같다.
+## 24. 주최 측 Vercel AI Gateway 공급자 (브랜치 `feat/ai-gateway-provider`)
+
+- 요청(2026-10-30): 팀원 PC·Google 직접 API 없이 Docker·배포 서버에서 주최 측 Gateway로 AI를 호출한다. 기존 공급자 유지, 실제 키 설정·전환·머지는 보류.
+- 구현: `server/gateway-client.js`(Chat Completions 구조화 출력), `server/gateway-transcribe.js`(전사 → 기존 시간 구간 형식). `AI_PROVIDER=gateway`면 코칭·구간 대화·문단 수정·새 대본·도움 대화·전사가 모두 Gateway를 쓰고 에이전트 모드는 꺼진다. 상태 API에 공급자·키 있음·실제 연결 여부·사용량 추가. 외부 처리 안내 문구만 최소 수정. 문서: [docs/ai-gateway.md](docs/ai-gateway.md).
+- 확인한 것: `node --test` 223개 통과(새 14개, 가짜 응답만). 네트워크 감시로 Gateway·Google 요청 0건.
+- 한계: 실제 Gateway 연결·모델 품질·전사 정확도는 검증하지 않았다. 호출량 제한은 서버 메모리 기준이라 팀 전체 예산을 완전히 보장하지 않는다.
+
+## 2026-10-30 — PR #15 전사 조각 시간 보완 (Codex 인계)
+
+- Gateway 공식 규격의 시간 구간은 선택 항목임을 확인. 정상 text-only 전사는 WAV 조각 전체 범위로 반환하고 `timingPrecision: chunk`를 표시한다. 빈 전사는 빈 구간을 유지하고, 유효한 모델 구간은 보존한다.
+- importer에서 시간 정밀도를 보존하고, 조각 전사는 평균 속도·군말 후보만 집계한다. 세부 속도 변화·단어별 반복/군말 시간을 만들지 않는다. 대본 연결도 조각 추정 시간에 의존하면 ambiguous로 낮추고 사용자 확인을 요구한다.
+- 전사 한도 문서: 코드 단독 1800초, Compose 기본 3600초로 구분. 기존 승인된 텍스트·전사 각 1회 연결 확인 보고를 기록했으며 이번 보완에서는 실제 모델 호출을 추가하지 않았다.
+- 검사: 전체 226개 통과(Node 25 호스트 및 Node 22 Docker). Docker 검사에는 외부 네트워크를 끄고 키를 주입하지 않았다. 테스트 소스와 local-ai의 추적된 테스트 의존 모듈만 읽기 전용 마운트했다. Docker 이미지 빌드·diff 공백 검사 통과.
+- 제한: 실제 발표 정확도·이번 보완의 실제 Gateway 재호출·UI PR #14 통합은 미검증. 클라이언트는 align 요청에 timingPrecision을 전달해야 한다. 머지·운영 공급자 변경은 하지 않는다.

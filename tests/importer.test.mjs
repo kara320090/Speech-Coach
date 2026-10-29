@@ -31,8 +31,8 @@ test("planChunks: 짧은 소리는 한 조각, 빈 소리는 조각 없음", () 
 test("chunkSegments: 구간 정보는 파일 시간으로 옮기고, 없으면 조각 전체 한 개로 대신한다", () => {
   const chunk = { startSec: 40, endSec: 60 }
   assert.deepEqual(chunkSegments(chunk, { segments: [{ text: "가나다", startSecond: 1, endSecond: 3 }] }), [{ startSec: 41, endSec: 43, text: "가나다" }])
-  assert.deepEqual(chunkSegments(chunk, { text: "전체 글", segments: [] }), [{ startSec: 40, endSec: 60, text: "전체 글" }])
-  assert.deepEqual(chunkSegments(chunk, { text: "전체 글", segments: [{ text: "범위 밖", startSecond: 50, endSecond: 55 }] }), [{ startSec: 40, endSec: 60, text: "전체 글" }])
+  assert.deepEqual(chunkSegments(chunk, { text: "전체 글", segments: [] }), [{ startSec: 40, endSec: 60, text: "전체 글", timingPrecision: "chunk" }])
+  assert.deepEqual(chunkSegments(chunk, { text: "전체 글", segments: [{ text: "범위 밖", startSecond: 50, endSecond: 55 }] }), [{ startSec: 40, endSec: 60, text: "전체 글", timingPrecision: "chunk" }])
   assert.deepEqual(chunkSegments(chunk, {}), [])
 })
 

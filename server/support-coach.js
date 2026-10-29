@@ -2,6 +2,7 @@
 import { CoachError } from "./local-coach.js"
 import { createGeminiClient, DEFAULT_GEMINI_MODEL } from "./gemini-client.js"
 import { createRemoteCoach, remoteLimits } from "./remote-coach.js"
+import { gatewayText, usesGateway } from "./coach-provider.js"
 import { checkRevision } from "../public/js/content-check.js"
 
 export const SUPPORT_PROMPT_VERSION = "supportive-dialogue-v1"
@@ -65,6 +66,11 @@ support-rewrite는 사용자가 명시적으로 허락한 경우에만 수행한
 }
 
 export function createSupportCoach({ env = {}, fetchImpl = fetch, now } = {}) {
+  if (usesGateway(env)) {
+    // Gateway 모드: 같은 대화 규칙(supportSpec)·동의 절차를 쓰고 호출만 주최 측 Gateway로 보낸다(Vercel 프록시 120초 안).
+    const { client, info } = gatewayText(env, { timeoutMs: Math.min(110000, Math.max(5000, Number(env.SUPPORT_GEMINI_TIMEOUT_MS) || 105000)), fetchImpl, notice: "동의하고 함께 살펴보기를 누르면 선택한 대본·근거·관찰 텍스트·이 대화의 답변을 주최 측 Vercel AI Gateway를 거쳐 Google Gemini로 보내요. 녹음·영상·얼굴은 보내지 않아요." })
+    return createRemoteCoach({ client, info, limits: remoteLimits({ ...env, AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE: env.AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE || 6 }), spec: supportSpec, promptVersion: SUPPORT_PROMPT_VERSION, ...(now && { now }) })
+  }
   const model = String(env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL).trim(), apiKey = String(env.GEMINI_API_KEY || "").trim()
   const info = { provider: "gemini", model, processing: "external:google-gemini", keyConfigured: Boolean(apiKey), processingNotice: "동의하고 함께 살펴보기를 누르면 선택한 대본·근거·관찰 텍스트·이 대화의 답변을 Google Gemini로 보내요. 녹음·영상·얼굴은 보내지 않아요." }
   let client = null

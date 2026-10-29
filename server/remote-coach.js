@@ -70,21 +70,24 @@ export function createRemoteCoach({ client, info, limits = remoteLimits(), now =
   let lastVerifiedAt = null
   let lastFailure = null
   let lastError = null // { code, httpStatus, providerStatus, providerReason, at, hint } — 원문 메시지·키·요청 내용 없음
+  const label = info.label || "Gemini" // 안내 문구의 공급자 이름(Gemini 직접 / AI Gateway)
+  const dest = info.destination || "Google Gemini API"
+  const usage = { requests: 0, promptTokens: 0, completionTokens: 0, reasoningTokens: 0 } // 숫자만(본문·키 없음), 메모리 기준
 
   function status() {
-    const base = { provider: client?.provider || info.provider, model: client?.model || info.model, promptVersion, processing: info.processing, processingNotice: info.processingNotice, keyConfigured: info.keyConfigured, connection, lastVerifiedAt, lastError }
+    const base = { provider: client?.provider || info.provider, model: client?.model || info.model, promptVersion, processing: info.processing, processingNotice: info.processingNotice, keyConfigured: info.keyConfigured, connection, lastVerifiedAt, lastError, usage: { ...usage } }
     if (info.configError) return { ...base, ready: false, reason: info.configError.reason, message: info.configError.message }
-    if (connection === "failed") return { ...base, ready: false, reason: lastFailure, message: `마지막 요청에서 Gemini 설정 문제(${lastFailure})가 확인됐어요. 서버 설정을 고친 뒤 다시 배포해 주세요. 자료 저장·직접 수정은 계속할 수 있어요.` }
+    if (connection === "failed") return { ...base, ready: false, reason: lastFailure, message: `마지막 요청에서 ${label} 설정 문제(${lastFailure})가 확인됐어요. 서버 설정을 고친 뒤 다시 배포해 주세요. 자료 저장·직접 수정은 계속할 수 있어요.` }
     const wait = Math.ceil((cooldownUntil - now()) / 1000)
-    if (wait > 0) return { ...base, ready: true, reason: "cooldown", retryAfter: wait, message: `Gemini 사용 한도로 ${wait}초 동안 요청을 쉬고 있어요. 그 뒤에 다시 실행할 수 있어요.` }
-    if (connection === "verified") return { ...base, ready: true, reason: "ready", message: "Gemini 연결이 확인됐어요. AI 실행을 누른 텍스트만 Google Gemini API로 보내 처리해요." }
-    return { ...base, ready: true, reason: "key-configured", message: "Gemini API 키가 설정돼 있어요. 실제 연결은 첫 AI 실행에서 확인돼요. AI 실행을 누른 텍스트만 Google Gemini API로 보내 처리해요." }
+    if (wait > 0) return { ...base, ready: true, reason: "cooldown", retryAfter: wait, message: `${label} 사용 한도로 ${wait}초 동안 요청을 쉬고 있어요. 그 뒤에 다시 실행할 수 있어요.` }
+    if (connection === "verified") return { ...base, ready: true, reason: "ready", message: `${label} 연결이 확인됐어요. AI 실행을 누른 텍스트만 ${dest}로 보내 처리해요.` }
+    return { ...base, ready: true, reason: "key-configured", message: `${label} 키가 설정돼 있어요. 실제 연결은 첫 AI 실행에서 확인돼요. AI 실행을 누른 텍스트만 ${dest}로 보내 처리해요.` }
   }
 
   function admit(client) {
     const t = now()
     const wait = Math.ceil((cooldownUntil - t) / 1000)
-    if (wait > 0) throw Object.assign(new CoachError(429, "provider-rate-limited", `Gemini 사용 한도로 잠시 요청을 쉬고 있어요. ${wait}초 뒤에 다시 시도해 주세요. ${KEEP}`), { retryAfter: wait })
+    if (wait > 0) throw Object.assign(new CoachError(429, "provider-rate-limited", `${label} 사용 한도로 잠시 요청을 쉬고 있어요. ${wait}초 뒤에 다시 시도해 주세요. ${KEEP}`), { retryAfter: wait })
     if (active >= limits.concurrent) throw new CoachError(429, "busy", `다른 AI 요청을 처리 중이에요. 잠시 후 다시 시도해 주세요. ${KEEP}`)
     if (day.count(t) >= limits.perDay) throw rateLimited(day.retryAfter(t), "오늘 이 서버의")
     if (minute.count(t) >= limits.perMinute) throw rateLimited(minute.retryAfter(t), "이 서버의 분당")
@@ -102,10 +105,12 @@ export function createRemoteCoach({ client, info, limits = remoteLimits(), now =
     const [system, user] = spec.buildMessages(input)
     const start = now()
     try {
-      const { raw } = await client.generateJson({ system: system.content, user: user.content, schema: spec.outputSchema(input), temperature: input.task === "review" ? 0 : 0.2, signal })
+      usage.requests++
+      const { raw, usage: used } = await client.generateJson({ system: system.content, user: user.content, schema: spec.outputSchema(input), temperature: input.task === "review" ? 0 : 0.2, signal })
       connection = "verified"
       lastVerifiedAt = new Date(now()).toISOString()
       lastError = null
+      for (const k of ["promptTokens", "completionTokens", "reasoningTokens"]) usage[k] += Number(used?.[k]) || 0
       return { requestId: input.requestId, versionId: input.versionId, task: input.task, model: client.model, promptVersion, durationMs: now() - start, result: spec.validateOutput(raw, input) }
     } catch (e) {
       if (e instanceof CoachError) {
@@ -139,7 +144,7 @@ export function createRemoteCoach({ client, info, limits = remoteLimits(), now =
       // 근거 자료 없는 답변 검토는 모델을 부르지 않는다(자체 모델 방식과 같은 규칙).
       if (input.task === "review" && !input.sources) return { requestId: input.requestId, versionId: input.versionId, task: input.task, model: "rule:no-source", promptVersion, durationMs: 0, result: { state: "uncertain", supported: "", answerQuote: "", sourceQuote: "", nextStep: "답변을 확인할 근거 자료가 아직 없어요. 원자료를 붙여 넣으면 그 내용과 함께 살펴볼 수 있어요.", humanReview: "unreviewed", evidenceStatus: "no-source-material" } }
       if (info.configError) throw new CoachError(503, info.configError.reason, info.configError.message)
-      if (connection === "failed") throw new CoachError(503, lastFailure, `Gemini 설정 문제(${lastFailure})가 확인돼 요청을 보내지 않았어요. 서버 설정을 고친 뒤 다시 배포해 주세요. ${KEEP}`)
+      if (connection === "failed") throw new CoachError(503, lastFailure, `${label} 설정 문제(${lastFailure})가 확인돼 요청을 보내지 않았어요. 서버 설정을 고친 뒤 다시 배포해 주세요. ${KEEP}`)
       // 같은 요청 ID나 같은 내용의 요청이 처리 중이면 새로 호출하지 않고 그 결과를 함께 쓴다.
       const { requestId: _requestId, ...content } = input
       const fingerprint = createHash("sha256").update(JSON.stringify(content)).digest("hex")
