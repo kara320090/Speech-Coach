@@ -18,6 +18,7 @@
 | F12 | B3 | FR-12 | AC-12 | UI-08 | S8 | T12 | R3 / 계획·미구현 |
 | F13 | B6 | FR-13 | AC-13 | UI-09 | S9 | T13 | R1 / 계획·미구현 |
 | F14 | B6 | FR-14 | AC-14 | UI-10·07 | S10 | T14 | R2 / 계획·미구현 |
+| F15 | B7 | FR-15 | AC-15 | UI-11·06·07 | S11 | T15 | R1(이해 확인)·R3(다듬기·교차검증) / 계획·미구현 |
 | (번호 미배정) 영상 불러오기·선택 글자 변환 | B1 | — | — | `/import.html` → UI-03 | (scenarios.yaml 미포함) | 단위·`e2e/media/import.spec.ts` | 코드 존재 / 실제 AI Gateway·배포 미검증, 번호 결정 대기 |
 
 코칭 흐름 세부 연결: 화면 상태는 [화면 명세 2.1](screen-spec.md), 검증 사례 C1–C14는 [검증 계획 4.1](validation-plan.md)에서 T11–T14에 연결된다. 기록 구분(observation·userReport·hypothesis·trialOutcome)과 저장·전송 규칙은 [요구사항 분석 4.6–4.7](requirements-analysis.md).
@@ -32,7 +33,7 @@
 | [경쟁 분석](competitive-analysis.md) | 직접 확인·공식 설명·미확인·증거·차별화 결정 |
 | [요구사항 정의](requirements-definition.md) | B/FR/AC/NFR, 입력·출력·예외·수용 기준 |
 | [요구사항 분석](requirements-analysis.md) | 구조·데이터·API·판정 규칙·오류·구현 차이 |
-| [화면 명세](screen-spec.md) / [실제 흐름](scenarios.yaml) | 현재 화면·S1–S4와 계획 화면·S5–S10 |
-| [검증 계획](validation-plan.md) | T01–T14·사용자 검증·실행 증거·미검증 |
+| [화면 명세](screen-spec.md) / [실제 흐름](scenarios.yaml) | 현재 화면·S1–S4와 계획 화면·S5–S11 |
+| [검증 계획](validation-plan.md) | T01–T15·사용자 검증·실행 증거·미검증 |
 | [결정 기록](decisions.md) | 사용자 지시·근거 상태·기존 기록 보존·미확인 |
 | [진행 기록](../progress.md) / [README](../README.md) | 현재 구현·실행 방법·검사·남은 일 |
