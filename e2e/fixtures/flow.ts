@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test"
 
 /** 첫 화면을 열고 온보딩(사용 방법 4단계)을 건너뛴다. */
 export async function openMain(page: Page) {
-  await page.goto("/")
+  await page.goto("/#/")
   await page.getByRole("button", { name: "건너뛰기" }).click()
   await expect(page.getByRole("button", { name: "녹화 시작" })).toBeVisible()
 }

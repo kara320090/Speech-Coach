@@ -3,7 +3,7 @@ const SCRIPT='캐시는 최근 결과를 5분 동안 저장해 같은 요청에 
 
 test('S5 확인한 대본 위치에서 대화하고 수정안을 확인·적용한 뒤 다시 연습한다',async({page})=>{
  const errors:string[]=[];let transcriptions=0;page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().endsWith('/api/transcribe')&&r.method()==='POST')transcriptions++})
- await page.goto('/studio.html');await page.getByRole('button',{name:'바로 서비스 이용하기'}).click()
+ await page.goto('/');await page.getByRole('button',{name:'바로 서비스 이용하기'}).click()
  await page.getByLabel('발표 대본').fill(SCRIPT)
  await page.getByRole('button',{name:'카메라 확인하기'}).click()
  await page.getByRole('button',{name:'녹화 시작'}).click()
