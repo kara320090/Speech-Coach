@@ -1,0 +1,11 @@
+{
+  "name": "loopthon-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
