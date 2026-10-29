@@ -155,5 +155,6 @@ test("feedback cap, skipped questions and literal model text never execute marku
   await expect(page.locator("#attempt-history")).toContainText("<img src=x")
   page.once("dialog", dialog => dialog.accept())
   await page.getByRole("button", { name: "이 페이지 자료 삭제" }).click()
+  await expect(page.locator("#request-state")).toContainText("이 페이지의 저장 자료를 삭제했어요")
   await page.reload(); await expect(page.getByLabel("분석할 대본 구간")).toBeEmpty()
 })
