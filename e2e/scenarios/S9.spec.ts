@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { openMain, setTarget, stopAndAnalyze } from "../fixtures/flow"
 
 /**
- * docs/scenarios.yaml의 S9(F13 상황 확인)와 S10(F14 조건 시험)의 핵심 흐름. 마이크가 없어도 검토 구간이 생기도록 구간 계획을 일부러 넘긴다.
+ * docs/scenarios.yaml의 S9(F13 상황 확인·F14 조건 시험). 마이크가 없어도 검토 구간이 생기도록 구간 계획을 일부러 넘긴다.
  * 판정 대신 질문(확인 → 그때 있었던 일 → 바꿔 볼 조건)을 거쳐 그 구간만 다시 연습하고 전후를 비교한다.
  */
 test("S9 학생이 다시 볼 구간에 답하고 제안받은 조건으로 그 구간만 다시 연습해 전후를 비교한다", async ({ page }) => {
@@ -43,6 +43,9 @@ test("S9 학생이 다시 볼 구간에 답하고 제안받은 조건으로 그 
   await expect(cmp).toContainText("이유: 다음 내용이 안 떠오름")
   await expect(cmp).toContainText("핵심어 카드")
   const table = cmp.getByTestId("practice-compare")
-  for (const label of ["말 속도", "군말", "긴 침묵", "시선 이탈 비율"]) await expect(table.getByRole("row", { name: new RegExp(label) })).toBeVisible()
+  for (const label of ["말 속도", "군말", "긴 침묵", "시선 이탈 비율"]) {
+    const cells = table.getByRole("row", { name: new RegExp(label) }).getByRole("cell")
+    await expect(cells).toHaveText([label, "측정 못 함", "측정 못 함"])
+  }
   await expect(cmp).not.toContainText("점수:")
 })

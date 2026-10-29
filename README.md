@@ -11,7 +11,7 @@
 - 프론트엔드: [공개 웹](https://speech-coach-public.vercel.app/), Vercel의 `Other` 프리셋, 출력 폴더 `public`. `vercel.json`이 `/api/*`와 `/__health`를 Render 백엔드로 전달한다.
 - 백엔드: `https://speech-coach-2j01.onrender.com`. 화면·코칭·전사·파일 가져오기 API를 제공한다.
 - 자체 AI: 운영 PC에서 Qwen·faster-whisper를 직접 실행한다. `npm run start:agent`가 모델을 시작하고 Render의 서명된 작업을 처리한다. 코칭·전사는 외부 AI 제공자 API와 추가 학습 없이 처리하고, 새 대본 생성만 Gemini 3.8 Flash를 사용한다.
-- 요청마다 Ed25519 서명·본문 해시·시간·재전송 여부를 확인한다. Git에는 공개 키만 포함하고 개인 키·모델·개인 실행 설정은 운영 PC에 보관한다.
+- 요청마다 Ed25519 서명·본문 해시·시간·재전송 여부를 확인한다. Git에는 공개 키만 포함하고 개인 키·개인 실행 설정은 운영 PC에 보관한다. 모델 가중치는 별도의 GitHub Release에서 제공한다.
 - 운영 PC와 에이전트가 실행 중이어야 AI를 사용할 수 있다. PC가 꺼지면 웹 기본 기능은 유지되고 AI 연결 상태를 안내한다. Render 무료 서버에 모델을 올리거나 PC의 모델 포트를 인터넷에 공개하지 않는다.
 
 준비·실행 명령은 [자체 AI 실행 안내](local-ai/README.md)에 있다.
@@ -54,7 +54,7 @@ Node 22.13 이상이 필요하다. 문서 추출용 패키지는 `npm ci --omit=
 npm start
 ```
 
-`http://localhost:3000`에서 기존 연습, `/coach.html`에서 자료 저장·직접 편집을 사용할 수 있다. AI 기능은 별도 모델 프로세스가 필요하며 모델이 없으면 상태를 안내한다. **모델 설치·시작 명령은 [자체 AI 실행 안내](local-ai/README.md)**. 모델·실행기 파일은 Git에 포함하지 않는다.
+`http://localhost:3000`에서 기존 연습, `/coach.html`에서 자료 저장·직접 편집을 사용할 수 있다. `npm start`로 실행한 경우 AI는 별도 모델 프로세스가 필요하며 모델이 없으면 상태를 안내한다. **모델 설치·시작 명령은 [자체 AI 실행 안내](local-ai/README.md)**. 큰 모델 파일은 Git 커밋 대신 GitHub Release에 포함하고, 평가용 Docker는 같은 가중치와 실행기를 이미지에 준비한다.
 
 | 환경변수 | 용도 |
 | --- | --- |
@@ -77,7 +77,7 @@ npm start
 
 ## 검사와 배포 범위
 
-`node --test --test-concurrency=1`: **163개 통과**. 기존 S1–S4·S9 **5개**, 메인 전사·기존 녹화·파일·대본 코칭 별도 미디어 검사 **35항목 확인**. 생성 서비스와 코칭의 독립성은 가짜 응답·실제 서명된 에이전트 전송으로 검사했다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다. [진행 기록](progress.md).
+`node --test --test-concurrency=1`: **184개 통과**. 제출 흐름은 S1–S7·S9 **8개**이며, 메인 전사·기존 녹화·파일·대본 코칭 별도 미디어 검사도 **35항목 확인**했다. 생성 서비스와 코칭의 독립성은 가짜 응답·실제 서명된 에이전트 전송으로 검사했다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다. [진행 기록](progress.md).
 
 `docker compose up --build`는 자체 CPU 모델과 웹을 함께 제공하며, 공개 Render는 서명된 운영 PC 에이전트로 코칭·전사를 처리한다. PC의 `npm run start:agent`와 모델이 실행 중이어야 자체 AI를 사용할 수 있다. 새 대본 생성은 서버 환경의 Gemini 키를 별도로 사용하며, 생성 서비스가 준비되지 않아도 기존 대본으로 연습할 수 있다. 검사는 [진행 기록](progress.md)에서 현재 확인 범위를 구분한다.
 
@@ -92,7 +92,7 @@ npm start
 | [코칭 설계](docs/coaching-design.md) | 이해 확인·긍정적 피드백·가상 예시·선택권 |
 | [경쟁 분석](docs/competitive-analysis.md) | 직접 확인·공식 설명·미확인 구분 |
 | [요구사항 정의](docs/requirements-definition.md) / [분석](docs/requirements-analysis.md) | 기능·수용 조건·구조·데이터·인터페이스 |
-| [화면·흐름](docs/screen-spec.md) / [현재 제출 흐름](docs/scenarios.yaml) | 새 화면과 기존 S1–S4·S9 |
+| [화면·흐름](docs/screen-spec.md) / [현재 제출 흐름](docs/scenarios.yaml) | S1–S7·S9의 8개 화면 흐름과 대응 E2E |
 | [검증](docs/validation-plan.md) / [추적표](docs/traceability.md) | 요구·검사·실제 확인 범위 |
 | [결정 기록](docs/decisions.md) / [진행 기록](progress.md) | 범위 변경·근거·확인/미확인 |
 | [파일 불러오기](docs/import-feature.md) / [영상·군말 측정](docs/media-measurements.md) | 자체 전사·브라우저 측정·예외 |
