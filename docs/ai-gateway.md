@@ -30,7 +30,7 @@ API 요청·응답 계약은 그대로다. 전사 결과는 기존 `{ text, segm
 | `AI_GATEWAY_TIMEOUT_MS` | 글 요청 대기, 최대 110초 |
 | `AI_GATEWAY_TRANSCRIBE_TIMEOUT_MS` | 전사 대기, 기본 90초·최대 110초 |
 | `AI_MAX_REQUESTS_PER_MINUTE` / `_PER_DAY` / `_PER_CLIENT_PER_MINUTE` / `AI_MAX_CONCURRENT` | 기능별 호출량 상한(기본 10 / 200 / 4 / 2, 도움 대화 사용자별 6) |
-| `TRANSCRIBE_TOTAL_SECONDS` | Gateway 전사 누적 길이 상한, 기본 1800초 |
+| `TRANSCRIBE_TOTAL_SECONDS` | Gateway 전사 누적 길이 상한. 코드 단독 기본 1800초, Docker Compose 기본 3600초(환경변수로 변경 가능) |
 
 Docker Compose: 셸이나 `.env`에 값을 두고 `AI_PROVIDER=gateway docker compose up --build`. 키는 compose 파일에 적지 않고 `${AI_GATEWAY_API_KEY}`로만 전달한다. Render 등 배포 서버는 대시보드 비밀 환경변수로 설정한다.
 
@@ -45,4 +45,13 @@ Docker Compose: 셸이나 `.env`에 값을 두고 `AI_PROVIDER=gateway docker co
 - **이 제한은 서버 한 대의 메모리 기준이며 재시작하면 초기화된다. 팀 전체 10달러 예산을 완전히 보장하지 않는다.** 주최 측 Gateway 대시보드의 사용량·한도를 함께 확인해야 한다.
 
 ## 검증 범위
-`tests/gateway.test.mjs`는 가짜 응답만 쓴다(Gateway·Google 주소로의 실제 요청을 막는 장치 포함). 요청 형식·응답 검증·오류 분류·제한을 확인했을 뿐, 실제 Gateway 연결·모델 품질·전사 정확도는 검증하지 않았다. 음성 → 글자는 Vercel 문서상 베타이며 키별 접근 권한을 실제 호출로 확인해야 한다.
+`tests/gateway.test.mjs`는 가짜 응답만 쓴다(Gateway·Google 주소로의 실제 요청을 막는 장치 포함). 요청 형식·응답 검증·오류 분류·제한을 확인했을 뿐, 전체 모델 품질·전사 정확도를 검증한 것은 아니다. 음성 → 글자는 Vercel 문서상 베타이며 키별 접근 권한을 실제 호출로 확인해야 한다.
+
+
+## 시간 구간이 없는 전사
+공식 REST 규격의 `segments`는 모델이 제공할 때만 존재하며, 예제도 빈 배열을 허용한다. `text`만 있는 정상 응답은 입력 WAV 조각 전체(0~조각 길이)를 한 구간으로 반환하고 `timingPrecision: "chunk"`를 응답·구간에 표시한다. 빈 전사에는 구간을 만들지 않는다. 유효한 모델 구간은 그대로 유지한다.
+
+브라우저는 파일 전체 시간으로 이동할 때 이 표시를 보존한다. 전체 평균 속도와 군말 후보 수는 집계하지만 조각 내부의 세부 속도 변화·반복 위치·단어 시각은 만들지 않는다. 군말 재생 위치는 조각 전체 범위이며 정확한 발생 시각이 아니다. 대본 연결 API에 전사 구간을 전달할 때 `timingPrecision`도 함께 보내야 한다. API는 조각 추정 시간에 의존한 결과를 자동 확정하지 않고 `ambiguous`로 반환한다. 표식을 누락하면 이 정밀도를 복구할 수 없다.
+
+## 소수 실제 연결 확인 기록
+이 보완 이전에 수행된 승인된 Docker 검사 보고에서 텍스트 1회(HTTP 200, 약 3.3초), 가상 음성 약 5초 1회(HTTP 200, 약 4.8초)가 성공했다. 텍스트는 입력 604·출력 59토큰, 전사는 글자만 반환하고 시간 구간·언어 정보는 없었다. 이는 두 합성 사례의 연결 확인일 뿐 실제 발표 정확도나 품질의 검증이 아니다. 이번 보완은 가짜 응답으로만 검사하며 실제 유료 호출을 추가하지 않는다.

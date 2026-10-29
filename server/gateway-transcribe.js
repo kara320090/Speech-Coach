@@ -56,8 +56,11 @@ export function createGatewayTranscriber({ env = {}, fetchImpl = fetch, baseUrl 
     if (typeof data?.text !== "string" || data.text.length > 12000) return fail(502, "invalid-output", "AI Gateway 전사 결과를 읽지 못했어요.")
     connection = "verified"; lastVerifiedAt = new Date().toISOString(); lastError = null
     // 모델이 준 구간만 그대로 쓰고, 조각 길이를 넘는 구간은 버린다(단어별 시간을 만들지 않음).
-    const segments = cleanSegments(data.segments).filter((s) => s.endSecond <= seconds + 0.5)
-    return { status: 200, body: { text: data.text, segments, language: typeof data.language === "string" ? data.language : null, durationInSeconds: seconds, processing: "external:ai-gateway" } }
+    let segments = cleanSegments(data.segments).filter((s) => s.endSecond <= seconds + 0.5)
+    // Gateway 문서에서 timestamps는 선택 항목이다. 발화 시각을 만들어내지 않고 입력 조각의 범위만 표시한다.
+    const timingPrecision = segments.length ? "segment" : "chunk"
+    if (!segments.length && data.text.trim()) segments = [{ text: data.text.trim(), startSecond: 0, endSecond: seconds, timingPrecision: "chunk" }]
+    return { status: 200, body: { text: data.text, segments, timingPrecision, language: typeof data.language === "string" ? data.language : null, durationInSeconds: seconds, processing: "external:ai-gateway" } }
   }
 
   return {

@@ -232,9 +232,11 @@ test("전사 요청 변환: /v4/ai/transcription-model·머리·base64 WAV, 응�
   assert.deepEqual(Object.keys(body).sort(), ["audio", "mediaType"])
   assert.equal(body.mediaType, "audio/wav")
   assert.deepEqual(Buffer.from(body.audio, "base64"), wav)
-  // 구간 정보가 없으면 빈 목록(화면이 조각 전체 한 구간으로 대신 씀)
+  // 구간 정보가 없으면 조각 전체 범위와 낮은 시간 정밀도를 명시한다.
   const g = fakeFetch(() => new Response(JSON.stringify({ text: "글만 있음", segments: [] }), { status: 200 }))
-  assert.deepEqual((await createTranscriber({ env: env(), fetchImpl: g }).run(wavOf(1), signal())).body.segments, [])
+  const fallback = (await createTranscriber({ env: env(), fetchImpl: g }).run(wavOf(1), signal())).body
+  assert.deepEqual(fallback.segments, [{ text: "글만 있음", startSecond: 0, endSecond: 1, timingPrecision: "chunk" }])
+  assert.equal(fallback.timingPrecision, "chunk")
 })
 
 test("전사 한도: WAV 형식·누적 길이·동시 실행·같은 조각 중복 공유·오류 처리", async () => {
@@ -287,4 +289,20 @@ test("기본(local)은 그대로: AI_PROVIDER가 없으면 Gateway를 부르지 
 
 test("키·본문은 로그(console)에 남지 않는다", () => {
   for (const s of [KEY, "결과를 5분"]) assert.ok(!logged.some((l) => l.includes(s)))
+})
+
+test("Gateway text-only timestamps survive HTTP and chunk conversion; empty speech has no fabricated segment", async () => {
+  const { chunkSegments } = await import("../public/js/importer.js")
+  const f = fakeFetch(() => new Response(JSON.stringify({ text: "음 가상 발표", language: null }), { status: 200 }))
+  await withServer({ env: env(), fetchImpl: f }, async base => {
+    const response = await fetch(`${base}/api/transcribe`, { method: "POST", body: wavOf(5) })
+    const body = await response.json()
+    assert.equal(response.status, 200)
+    assert.equal(body.timingPrecision, "chunk")
+    assert.deepEqual(chunkSegments({ startSec: 40, endSec: 45 }, body), [{ startSec: 40, endSec: 45, text: "음 가상 발표", timingPrecision: "chunk" }])
+  })
+  for (const text of ["", "  "]) {
+    const tr = createTranscriber({ env: env(), fetchImpl: fakeFetch(() => new Response(JSON.stringify({ text }), { status: 200 })) })
+    assert.deepEqual((await tr.run(wavOf(1), signal())).body.segments, [])
+  }
 })

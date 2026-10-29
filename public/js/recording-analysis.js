@@ -26,7 +26,8 @@ export async function analyzeRecordedSpeech({ samples, sampleRate, durationSec, 
     if (result.status !== "ok") return unavailable(result.status === "partial" ? "partial" : result.status, result.status === "partial" ? "일부 소리 조각을 전사하지 못했어요. 인식된 글만 보존하고 전체 속도·군말 수치는 표시하지 않았어요." : result.message || "자체 AI 전사를 완료하지 못했어요. 녹음과 기본 결과는 보존돼요.", segments)
     const transcript = analyzeTranscript(segments, durationSec)
     if (transcript.status !== "ok") return unavailable("no-text", "자체 AI가 인식한 말이 없어 속도와 군말을 측정하지 않았어요.", segments)
-    return { status: "ok", detail: `녹음 소리만 ${state.transcription?.provider === "ai-gateway" ? "주최 측 AI Gateway로" : "자체 AI로"} 전사했어요. 군말과 속도는 인식된 글을 바탕으로 계산한 값이며, 누락·오인식이 있을 수 있어요.`, segments, transcript, fillers: analyzeFillers(segments) }
+    const timingNote = segments.some(s => s.timingPrecision === "chunk") ? " 시간은 소리 조각 전체의 추정 범위예요. 평균 속도·군말 후보만 집계하며 세부 속도 변화·단어 위치는 판단하지 않아요." : ""
+    return { status: "ok", detail: `녹음 소리만 ${state.transcription?.provider === "ai-gateway" ? "주최 측 AI Gateway로" : "자체 AI로"} 전사했어요. 군말과 속도는 인식된 글을 바탕으로 계산한 값이며, 누락·오인식이 있을 수 있어요.${timingNote}`, segments, transcript, fillers: analyzeFillers(segments) }
   } catch (error) {
     return unavailable(signal?.aborted ? "cancelled" : "error", signal?.aborted ? "자체 AI 전사를 취소했어요. 녹음과 기본 결과는 보존돼요." : "자체 AI 전사에 연결하지 못했어요. 녹음과 기본 결과는 보존돼요.")
   }

@@ -59,8 +59,9 @@ export function validateAlignInput(data, limits = ALIGN_LIMITS) {
     if (!s || typeof s !== "object") throw bad("invalid-input", `segments[${i}] 형식이 맞지 않아요.`, `segments[${i}]`)
     if (typeof s.text !== "string" || s.text.length > limits.segmentChars) throw bad("invalid-input", `segments[${i}].text는 ${limits.segmentChars}자 이하 문자열이어야 해요.`, `segments[${i}].text`)
     if (!isTime(s.startSecond) || !isTime(s.endSecond) || s.endSecond < s.startSecond) throw bad("invalid-time", `segments[${i}]의 시간(startSecond ≤ endSecond, 0~${limits.maxSecond}초)이 올바르지 않아요.`, `segments[${i}]`)
+    if (s.timingPrecision !== undefined && !["segment", "chunk"].includes(s.timingPrecision)) throw bad("invalid-input", "timingPrecision은 segment 또는 chunk여야 해요.", "segments")
     chars += s.text.length
-    return { index: i, startSecond: s.startSecond, endSecond: s.endSecond, text: s.text }
+    return { index: i, startSecond: s.startSecond, endSecond: s.endSecond, text: s.text, ...(s.timingPrecision ? { timingPrecision: s.timingPrecision } : {}) }
   })
   if (chars > limits.transcriptChars) throw bad("too-large", `전사 글자 수는 합계 ${limits.transcriptChars.toLocaleString("en-US")}자까지 처리해요.`, "segments", 413)
   const ids = new Set()
@@ -268,7 +269,7 @@ export function alignPoints(input) {
   if (input.segments.length * sentences.length > ALIGN_LIMITS.work) throw bad("too-large", "전사 구간 수와 대본 문장 수가 너무 많아요. 구간을 나누어 보내 주세요.", "segments", 413)
   const aligned = alignSegments(input.segments, sentences)
   const byIndex = new Map(aligned.map((a) => [a.index, a]))
-  const segView = (s) => s && { index: s.index, startSecond: s.startSecond, endSecond: s.endSecond, text: s.text, alignment: view(byIndex.get(s.index)) }
+  const segView = (s) => s && { index: s.index, startSecond: s.startSecond, endSecond: s.endSecond, text: s.text, ...(s.timingPrecision ? { timingPrecision: s.timingPrecision } : {}), alignment: view(byIndex.get(s.index)) }
   const sentView = (j, role, score = null) => ({ sentenceId: sentences[j].id, index: j, paragraphIndex: sentences[j].paragraphIndex, text: sentences[j].text, start: sentences[j].start, end: sentences[j].end, role, score })
   function view(a) {
     if (!a) return null
@@ -289,7 +290,12 @@ export function alignPoints(input) {
       algorithmVersion: ALGORITHM_VERSION,
       transcript: { during: during.map(segView), before: segView(beforeSeg), after: segView(afterSeg), gapBeforeSecond: beforeSeg ? round(p.startSecond - beforeSeg.endSecond) : null, gapAfterSecond: afterSeg ? round(afterSeg.startSecond - p.endSecond) : null },
     }
-    const out = (status, position, candidates, reasons, extra = {}) => ({ ...base, status, position, primarySentenceId: status === "matched" ? candidates[0]?.sentenceId ?? null : null, candidates, reasons, ...extra })
+    const coarse = [...during, beforeSeg, afterSeg].filter(Boolean).some(s => s.timingPrecision === "chunk")
+    const out = (status, position, candidates, reasons, extra = {}) => ({ ...base,
+      status: coarse && status === "matched" ? "ambiguous" : status, position,
+      primarySentenceId: status === "matched" && !coarse ? candidates[0]?.sentenceId ?? null : null,
+      candidates, reasons: coarse ? [...reasons, { code: "coarse-timing", message: "조각 단위 추정 시간이므로 이 지점의 문장을 확정할 수 없어요. 직접 확인해 주세요." }] : reasons,
+      ...(coarse ? { timingPrecision: "chunk" } : {}), ...extra })
     const al = (s) => s && byIndex.get(s.index)
     const ok = (a) => a && (a.status === "clear")
 
@@ -347,7 +353,7 @@ export function alignPoints(input) {
     algorithmVersion: ALGORITHM_VERSION,
     scoreNote: "score는 글자 2-gram 기반 유사도(0~1)이며 확률이나 검증된 정확도가 아니에요.",
     sentences,
-    segments: segs.map((s) => ({ index: s.index, startSecond: s.startSecond, endSecond: s.endSecond, alignment: view(byIndex.get(s.index)) })),
+    segments: segs.map((s) => ({ index: s.index, startSecond: s.startSecond, endSecond: s.endSecond, ...(s.timingPrecision ? { timingPrecision: s.timingPrecision } : {}), alignment: view(byIndex.get(s.index)) })),
     points,
   }
 }
