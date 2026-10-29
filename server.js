@@ -3,6 +3,7 @@ import http from "node:http"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { createScriptImportHandler } from "./server/script-import.js"
 
 import { createLocalCoach, CoachError, LIMITS } from "./server/local-coach.js"
 import { createLocalTranscriber } from "./server/local-transcribe.js"
@@ -48,9 +49,10 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks)
 }
 
-export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch } = {}) {
+export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits } = {}) {
   const coach = createLocalCoach({ env, fetchImpl })
   const transcriber = createLocalTranscriber({ env, fetchImpl })
+  const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
 
   async function api(req, res, pathname) {
     const controller = new AbortController()
@@ -85,6 +87,13 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
     try {
       const url = new URL(req.url, "http://localhost")
       if (["/api/transcribe", "/api/coach", "/api/model-status"].includes(url.pathname)) return await api(req, res, url.pathname)
+      if (url.pathname === "/api/scripts/import") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { Allow: "POST", ...HEADERS })
+          return res.end()
+        }
+        return await importScript(req, res)
+      }
       if (req.method !== "GET" && req.method !== "HEAD") {
         res.writeHead(405, { Allow: "GET, HEAD", ...HEADERS })
         return res.end()

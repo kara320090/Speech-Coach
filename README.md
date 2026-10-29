@@ -16,6 +16,8 @@ AI로 만든 대본의 낯선 표현을 풀어 보고, 자기 설명과 예상 �
 | 자체 LLM | Node→loopback llama.cpp, 공식 Qwen3-4B Q4_K_M 실제 실행. 인용 범위 제한·수치 변경 적용 차단·요청 취소·오류 처리 |
 | 자체 음성 전사 | 파일 불러오기→Node→loopback faster-whisper CPU worker. 외부 AI Gateway 코드는 제거 |
 | 기존 연습 | 목표·구간 시간, 마이크·선택 웹캠 기록, 침묵·전사 군말 후보·이전 회차 비교. 외부 처리 가능성이 있는 브라우저 실시간 음성 인식은 비활성화 |
+| TXT 대본 불러오기 | main의 파일 선택·편집·녹음 기록 연결을 유지 |
+| PDF·DOCX·TXT 추출 API | `POST /api/scripts/import`, 화면 연결은 후속. [API 안내](docs/script-import-api.md) |
 | 영상 눈 깜빡임 | MediaPipe를 브라우저에서만 실행. F21, 실제 얼굴 정확도 미검증 |
 | 후속 기획 | 개인 실측 시간에 맞춘 자동 수정, 세부 명제 의미 검사, 코칭·녹음의 완전한 연결, 상황 질문·환경 변경 자동 적용 등. [기능별 구현 범위](docs/local-ai-implementation.md) |
 
@@ -23,7 +25,7 @@ AI로 만든 대본의 낯선 표현을 풀어 보고, 자기 설명과 예상 �
 
 ## 실행
 
-Node 22 이상, 서버 npm 런타임 의존성과 프론트 빌드 단계는 없다.
+Node 22.13 이상이 필요하다. 문서 추출용 패키지는 `npm ci --omit=optional`로 설치한다. 프론트 빌드 단계는 없다.
 
 ```sh
 npm start
@@ -50,7 +52,7 @@ npm start
 
 ## 검사와 배포 범위
 
-`npm test`: 69개 통과. 기존 S1–S4 4개와 별도 미디어·코칭 24개 통과. 실제 Qwen 모델·웹 화면 실행, faster-whisper 준비 및 합성 무음 4초 처리도 확인했다. 실제 사람의 한국어 발표 전사·군말 인식 정확도, 학습 효과, 준비 시간 절감은 미검증이다. 상세: [검증 계획](docs/validation-plan.md), [진행 기록](progress.md).
+`npm test`: 69개 통과. 기존 S1–S4·S9 4개와 별도 미디어·코칭 24개 통과. 실제 Qwen 모델·웹 화면 실행, faster-whisper 준비 및 합성 무음 4초 처리도 확인했다. 실제 사람의 한국어 발표 전사·군말 인식 정확도, 학습 효과, 준비 시간 절감은 미검증이다. 상세: [검증 계획](docs/validation-plan.md), [진행 기록](progress.md).
 
 `docker compose up --build`와 Render 설정은 모델 없는 기본 웹 구성이다. 모델·GPU를 자동 설치하지 않는다. 컨테이너/Render의 localhost는 개발자 PC가 아니므로 AI 공개 배포에는 같은 운영 호스트에 추론 프로세스를 따로 준비해야 한다. 공개 AI 배포는 아직 검증하지 않았다. main 자동 배포를 위해 직접 push하지 않고 작업 브랜치·PR로 제출한다.
 
@@ -58,15 +60,17 @@ npm start
 
 | 문서 | 내용 |
 | --- | --- |
-| [문제 정의 YAML](docs/problem.yaml) / [캔버스 앞면·뒷면](docs/problem-canvas.md) | 새 문제·근거 구분, 기존 E1 보존, F1–F20 |
+| [문제 정의 YAML](docs/problem.yaml) / [캔버스 앞면·뒷면](docs/problem-canvas.md) | 새 문제·근거 구분, 기존 E1 보존, F1–F21 |
 | [서비스 기획](docs/product-plan.md) | 대상·차별화할 과업·범위·단계·성공 지표 |
 | [공개 프로젝트·자체 AI 설계](docs/local-ai-design.md) | 참고 저장소·라이선스·실행 방식·전송 경계 |
 | [구현 범위·남은 차이](docs/local-ai-implementation.md) | 기능별 현재 동작·한계·코드 연결 |
 | [코칭 설계](docs/coaching-design.md) | 이해 확인·긍정적 피드백·가상 예시·선택권 |
 | [경쟁 분석](docs/competitive-analysis.md) | 직접 확인·공식 설명·미확인 구분 |
 | [요구사항 정의](docs/requirements-definition.md) / [분석](docs/requirements-analysis.md) | 기능·수용 조건·구조·데이터·인터페이스 |
-| [화면·흐름](docs/screen-spec.md) / [현재 제출 흐름](docs/scenarios.yaml) | 새 화면과 기존 S1–S4 |
+| [화면·흐름](docs/screen-spec.md) / [현재 제출 흐름](docs/scenarios.yaml) | 새 화면과 기존 S1–S4·S9 |
 | [검증](docs/validation-plan.md) / [추적표](docs/traceability.md) | 요구·검사·실제 확인 범위 |
 | [결정 기록](docs/decisions.md) / [진행 기록](progress.md) | 범위 변경·근거·확인/미확인 |
 | [파일 불러오기](docs/import-feature.md) / [영상·군말 측정](docs/media-measurements.md) | 자체 전사·브라우저 측정·예외 |
 | [기존 계산 기준](docs/current-implementation.md) | 기본 시간·침묵·속도 계산의 기준 |
+
+main의 [UI·API 명세](docs/ui-api-spec.md)도 유지한다. 자체 모델 연결은 [실행 안내](local-ai/README.md)를 따른다. main 배포만으로 모델이 자동 설치되지는 않는다.

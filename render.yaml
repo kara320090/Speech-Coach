@@ -5,7 +5,9 @@ services:
     name: speech-coach
     runtime: node
     plan: free
-    buildCommand: npm install
+    # 대본 파일 읽기(/api/scripts/import)에 쓰는 패키지를 잠금 파일 그대로 설치한다(개발·선택 패키지 제외).
+    buildCommand: npm ci --omit=dev --omit=optional
+    # /__health의 releaseId에 배포한 commit을 넣는다. PORT는 Render가 넣어 주고 server.js가 읽는다.
     startCommand: RELEASE_ID=$RENDER_GIT_COMMIT node server.js
     healthCheckPath: /__health
     autoDeploy: true

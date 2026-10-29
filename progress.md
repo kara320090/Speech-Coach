@@ -1,5 +1,12 @@
 # Speech-Coach 진행 기록
 
+## 2026-10-30 main 통합·푸시
+
+- 사용자 지시로 main 병합을 진행했다. main의 다시봄 UI·TXT 불러오기·구간 코칭·PDF/DOCX 추출 API와 자체 AI·눈 깜빡임을 통합했다. main의 F15는 보존하고 눈 깜빡임은 F21로 조정했다.
+- 충돌 해결 후 Node 22.23.4 단위 **102개**, 기본 시나리오 **5개**, 미디어·코칭 **28개** 통과. 시나리오 YAML의 모든 단계가 문자열이며 E2E 파일과 연결되는 것도 확인했다.
+- Windows PDF.js 자원 경로의 끝 구분자 오류를 수정했다. 실제 사람 음성·얼굴 정확도, 학습 효과, 공개 자체 모델 배포는 이 검사에 포함되지 않는다.
+- 아래의 PR 제출·병합 보류 문구는 이전 작업 기록이다. 이번에는 사용자가 main 반영을 명시적으로 요청했다.
+
 ## 최신 구현 — 자체 모델로 대본 이해·수정·질의응답
 
 - 사용자 확정: 공개 모델 직접 실행, 초기 추가 학습 없음. 구현 후 커밋·푸시. main 직접 push 금지 유지.
@@ -176,3 +183,11 @@
 - 미확인: 실제 사람 얼굴과 카메라의 깜빡임 정확도, 다양한 브라우저·조명·안경·얼굴 각도, 실제 AI Gateway 응답·비용, Render 공개 배포. 프로세스·사용자·시스템 환경에 AI_GATEWAY_API_KEY가 없어 실제 호출은 하지 않았다. 값은 조회·출력하지 않았다.
 - 별도 미디어 회귀 검사 `e2e/media.config.ts`: 기존 13개와 신규 5개를 합해 **18개 모두 통과**(Chromium 가짜 장치, 1.8분). 기존 소리/웹캠·일시정지·기록 비교·키 없음·선택 전송도 확인했다. 실제 사람 정확도 검사는 아니다.
 - [PR #3](https://github.com/kara320090/Speech-Coach/pull/3)으로 제출했다. 코드 commit `4e6225e`의 [브랜치 CI](https://github.com/kara320090/Speech-Coach/actions/runs/40882093930)에서 Docker 기동·health·S1–S4 4개가 모두 통과했다. 기존 workflow는 main push만 자동 실행하므로 브랜치에서 workflow_dispatch로 검사했다. 이 결과를 기록하는 후속 commit은 문서만 변경하며, main push·병합·Render 배포는 수행하지 않았다.
+
+## 17. 대본 파일 글자 꺼내기 API (브랜치 `feat/script-import-api`, 백엔드만)
+
+- 요청(2026-10-29): `POST /api/scripts/import`로 TXT(UTF-8)·PDF(글자 있음)·DOCX 파일 하나(`file` 필드, 10MB 이하)를 받아 `{ fileName, text }`를 돌려준다. 프론트 화면은 바꾸지 않고 [API 문서](docs/script-import-api.md)로 인계한다.
+- 구현: `server/script-import.js`(멀티파트 받기·형식·크기·파일 머리 확인·오류 응답), `server/extract-worker.js`(PDF·DOCX 해석, 문서마다 새 작업 스레드·힙 256MB·20초·PDF 300쪽 상한), `server.js`는 라우트 연결만. 라이브러리는 유지보수 중인 `@fastify/busboy` 3.2.4, `pdfjs-dist` 6.4.299, `mammoth` 1.13.0(정확한 버전 고정, `npm audit` 0건). `pdf-parse`는 그림용 네이티브 패키지가 따라와서 쓰지 않았다. 파일은 메모리에서만 다루고 저장·외부 전송·로그 기록을 하지 않는다. Dockerfile·render.yaml은 잠금 파일로 운영 패키지만 설치(`npm ci --omit=dev --omit=optional`), Node 22.13 이상.
+- 확인한 것: `node --test` 73개 통과(새 15개: 실제 포트에 멀티파트로 가상 TXT·PDF·DOCX 업로드, 한글·줄·문단 보존, 오류 17종, 자원 한도, 기존 서버 기능, 로그 미기록). Docker 이미지 빌드 성공, 컨테이너(Node 22.23.4)에서 curl로 TXT·PDF·DOCX 200, 암호 PDF·스캔 PDF·파일 없음 오류 확인, 컨테이너 로그에 파일 내용 없음, `/tmp`에 남은 파일 없음, 기존 `/`·`/import.html`·`/api/transcribe` 응답 유지.
+- 확인하지 못한 것: 실제 사용자 문서(워드·한글 프로그램에서 만든 DOCX, 다단·표가 많은 PDF, 실제 암호 PDF·DOCX)로 한 검사, 화면 연결, Render 배포, 동시 접속 부하.
+- 2026-10-29 밤 추가: PR #7(TXT·PDF·DOCX 글자 꺼내기 API)이 올라와 solution_paths의 보류 경로를 "PPTX·OCR·슬라이드 조작"으로 좁히고 PDF·DOCX는 구현(화면 연결 전)으로 적었다. 캔버스 재생성.
