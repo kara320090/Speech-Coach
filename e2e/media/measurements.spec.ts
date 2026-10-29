@@ -12,9 +12,10 @@ async function importVideo(page: Page, analyze = false) {
   await page.getByRole("button", { name: "분석 시작", exact: true }).click()
 }
 
-test("real vendored model loads under CSP and processes a blank frame (not face accuracy)", async ({ page }) => {
+test("real vendored model loads under CSP and processes a blank frame (not face accuracy)", async ({ page, baseURL }) => {
   const external: string[] = [], violations: string[] = []
-  page.on("request", (r) => { if (/^https?:/.test(r.url()) && !r.url().startsWith("http://localhost")) external.push(r.url()) })
+  const expectedOrigin = new URL(baseURL!).origin
+  page.on("request", (r) => { if (/^https?:/.test(r.url()) && new URL(r.url()).origin !== expectedOrigin) external.push(r.url()) })
   page.on("console", (m) => { if (/violat.*Content Security Policy/i.test(m.text())) violations.push(m.text()) })
   await page.goto("/")
   const count = await page.evaluate(async () => {

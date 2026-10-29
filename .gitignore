@@ -25,6 +25,7 @@ e2e/blob-report/
 .cache/
 .turbo/
 .vercel/
+.test-artifacts/
 
 # 운영체제·편집기
 .DS_Store

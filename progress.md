@@ -1,9 +1,24 @@
 # Speech-Coach 진행 기록
 
+## 2026-10-30 메인 분석의 자체 AI 전사 연결
+
+- 메인 녹화 종료 후 분석에서 녹음을 먼저 저장하고, 자체 AI 전사→군말·말하기 속도→검토 위치→같은 기록 저장으로 연결했다. 영상은 보내지 않고 선택한 음성 조각만 자체 서버로 전송한다.
+- 연습 설정에 자체 AI 전사 선택을 제공하고, 진행·취소·서버 미준비·부분 실패·인식된 말 없음에서도 녹음과 기본 결과를 보존한다. 전사 선택 해제 시 음성 전송이 없고 부분 결과를 전체 수치로 표시하지 않는다.
+- 확인: 최신 대본 정렬 API 검사 포함 단위 163개, 기본 흐름 5개 통과. 미디어 35항목은 최초 32개와 갱신한 안내·출처 검사 3개 재검사로 모두 확인했다. 새 메인 전사 4개는 실제 WAV 요청·군말·속도·구간 재생·재조회·취소·선택 해제를 검사했다. 브라우저 검사 응답과 마이크·웹캠은 테스트 자료이며 사람의 인식 정확도를 뜻하지 않는다.
+- 공개 Vercel의 실제 자체 전사 연결과 합성 한국어 음성 검증은 배포 후 확인 범위에 기록한다.
+
+## 2026-10-30 새 대본 생성과 자체 AI 연습 역할 분리
+
+- 사용자 지정: 새 대본만 Gemini 3.8 Flash, 분석·쉬운 표현 수정·질문·답변 검토는 Qwen, 음성 전사는 faster-whisper. 기존 AI_PROVIDER 값과 관계없이 이 역할을 적용한다.
+- `/create-script.html`·`/api/scripts/generate`·생성 상태를 추가하고, 사용자 확인 후 원본·답변 이력을 보존한 새 버전으로 자체 AI 연습에 연결했다. F22와 정의·분석·기획·화면·추적 문서를 맞췄다.
+- 확인: 최신 모델 진단·호환성 검사 포함 Node 22 단위 142개, 기본 S1–S4·S9 5개, 생성·코칭 브라우저 9개 통과. 가짜 Gemini 실패 뒤에도 네 과업의 자체 모델 처리, 외부 자동 대체 없음, 서명된 에이전트 연결, 취소·한도·원본 보존을 검사했다. 기본 검사에서 실제 Google API는 호출하지 않았다.
+- 공개 검증: Vercel→Render→운영 PC 연결에서 개념·쉬운 표현 수정·질문·답변 검토가 각각 HTTP 200, 자체 음성 전사(합성 한국어 8.72초)와 TXT 추출도 HTTP 200이었다. 자체 모델 ready·에이전트 연결과 새 대본 생성용 Gemini 3.8 Flash의 독립된 상태를 확인했다. [Docker·핵심 흐름 CI](https://github.com/kara320090/Speech-Coach/actions/runs/40916368438)도 통과했다. 실제 사람 얼굴·음성 정확도, 학습 효과와 Gemini 초안의 내용 품질 검증은 별도다.
+
+
 ## 2026-10-30 main 통합·푸시
 
 - 사용자 지시로 main 병합을 진행했다. main의 다시봄 UI·TXT 불러오기·구간 코칭·PDF/DOCX 추출 API와 자체 AI·눈 깜빡임을 통합했다. main의 F15는 보존하고 눈 깜빡임은 F21로 조정했다.
-- 충돌 해결 후 Node 22.23.4 단위 **102개**, 기본 시나리오 **5개**, 미디어·코칭 **28개** 통과. 시나리오 YAML의 모든 단계가 문자열이며 E2E 파일과 연결되는 것도 확인했다.
+- 통합 반영 후 Node 22.23.4 단위 **102개**, 기본 시나리오 **5개**, 미디어·코칭 **28개** 통과. 시나리오 YAML의 모든 단계가 문자열이며 E2E 파일과 연결되는 것도 확인했다.
 - Windows PDF.js 자원 경로의 끝 구분자 오류를 수정했다. 실제 사람 음성·얼굴 정확도, 학습 효과, 공개 자체 모델 배포는 이 검사에 포함되지 않는다.
 - 아래의 PR 제출·병합 보류 문구는 이전 작업 기록이다. 이번에는 사용자가 main 반영을 명시적으로 요청했다.
 
@@ -199,3 +214,23 @@
 - 확인한 것: `node --test` 118개 통과(새 16개, 가짜 Gemini 응답만, 실제 API 호출 차단). E2E `coach-provider.spec.ts` 2개 통과.
 - 기존 문제(이번 변경과 무관): `e2e/media/coaching.spec.ts` 2개(rewrite 복원 문구, feedback cap 표시)가 main(`c283d1d`)에서도 같은 이유로 실패한다. 프론트 담당 확인 필요.
 - 확인하지 못한 것: 실제 Gemini 연결(키 미설정, 지시에 따라 미실행), Render 배포, 실제 응답의 스키마 수용·품질.
+
+## 19. Gemini `provider-model` 진단과 모델 접근 점검 (브랜치 `feat/gemini-diagnostics`, 모델 변경 전)
+
+- 배경(2026-10-30): 배포 프론트(https://speech-coach-public.vercel.app → Render)의 `/api/model-status`가 `connection: failed`, `reason: provider-model`(Google HTTP 404), `keyConfigured: true`. 호출 주소·버전·방식(`v1beta/models/gemini-2.5-flash:generateContent`, `x-goog-api-key`)은 공식 레퍼런스와 같다. Google 모델 문서는 2.5 모델 접근을 과거 사용자로 제한한다고 밝혀 가장 유력한 원인이지만, 키로 확인하기 전까지는 확정하지 않는다.
+- 조치: Google 오류의 HTTP 상태·열거 코드만 남기는 `providerDetail`, 상태 API `lastError`(정제 코드·안내만, 원문 메시지·키·요청 내용 없음), 생성 없는 `npm run gemini:check-models`(models.get). 모델·결제·생성 호출은 바꾸지 않았다.
+- 확인한 것: `node --test` 139개 통과(새 3개). 가짜 키를 넣고 전체 검사를 돌려도 Google 요청 0건(네트워크 감시). 키 없이 점검 명령을 실행하면 외부 요청 없이 끝남.
+- 남은 것: 사용자가 실제 키로 `npm run gemini:check-models gemini-2.5-flash gemini-3.8-flash gemini-3.5-flash-lite`를 실행해 결과 확인, 모델 결정.
+
+## 20. Gemini 3 생각 설정 호환성 수정 (브랜치 `fix/gemini-thinking-config`)
+
+- 배경(2026-10-30): 배포에서 `gemini-3.8-flash`로 '쉬운 대본 제안' 1회 실행 → "Gemini 서비스가 일시적으로 응답하지 않아요." 코드상 이 문구는 Google HTTP 5xx(504 제외)일 때만 나온다(우리 응답 503 `provider-unavailable`). 네트워크·시간 초과·응답 처리 문제는 아니다. 500/503 중 무엇인지는 당시 배포(`8b1ddd1`)에 진단 정보가 없어 미확인. PR #9(진단 `lastError`)는 CI 통과 후 병합(`0675a4e`).
+- 확인: `gemini-3.8-flash` 공식 모델 페이지는 thinking level low·medium·high만 지원하고 minimal(생각 끄기)은 오류라고 밝힌다. 기존 요청의 `thinkingBudget: 0`(생각 끄기)은 이와 맞지 않아 계열별 설정으로 바꿨다(2.5 Flash `thinkingBudget: 0`, 3.x `thinkingLevel: "low"`, 그 밖 미전송). 빈 문자열 enum은 공식 문서에 금지 문장이 없어 유지. temperature 1.0 권장은 비호환이 아니라 권장이라 유지하고 문서에 기록.
+- 확인한 것: `node --test` 140개 통과(새 1개). 네트워크 감시로 Google 요청 0건. 이 수정이 이번 5xx의 원인이었는지는 실제 재시험 전까지 단정하지 않는다.
+
+## 21. 검토 시점 ↔ 대본 문장 연결 API (브랜치 `feat/script-alignment`, 백엔드만)
+
+- 요청(2026-10-30): 영상·녹음의 검토 시점(예: 긴 침묵)을 앞뒤 전사 구간으로 대본 문장 근처에 연결해 AI 코칭에 넘길 수 있게 한다. 침묵만으로 원인을 판단하지 않는다. 기존 `practiceRange`(시간 비율 어림)는 발화를 보지 않아 재사용할 수 없었고, 문장 나누기 기준만 `splitSentences`와 맞췄다.
+- 구현: `server/script-align.js`(입력 검사·문장/문단과 원문 위치·정규화·글자 2-gram 유사도·Viterbi 단조 정렬과 forward-backward 후보·지점 연결·HTTP 처리기), `server.js`는 라우트만. 외부 AI 없음, 저장·로그 없음, 원문·기록 수정 없음. 결과는 matched/ambiguous/unmatched와 후보·근거·앞뒤 발화, `script-align-v1`. 문서: [docs/script-align-api.md](docs/script-align-api.md).
+- 확인한 것: `node --test` 155개 통과(새 13개, 실제 HTTP 포함 합성 사례). 네트워크 감시로 Google 요청 0건. 최대 작업량 합성 측정 약 0.2초·응답 약 400KB.
+- 한계: 합성 데이터만 확인했고 실제 발표 정확도는 검증하지 않았다. 숫자·영어 읽기 차이, 크게 바꿔 말하기, 여러 문장에 걸친 전사 구간에 약하다. 화면 연결 전.

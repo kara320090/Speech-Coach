@@ -78,13 +78,15 @@ test("agent permits HTTPS backend and loopback development targets only",()=>{
   assert.equal(backendUrl('https://example.com'),'https://example.com')
   for(const value of ['http://example.com','https://u:p@example.com','https://example.com/path','https://example.com/?key=x'])assert.throws(()=>backendUrl(value))
 })
-test("explicit Gemini selection on Render keeps text provider independent from the voice agent",async()=>{
+test("legacy Gemini configuration on Render still uses the self-hosted coaching agent",async()=>{
   const keys=pair();let calls=0
   const server=createServer({env:{RENDER:'true',AI_PROVIDER:'gemini',GEMINI_MODEL:'gemini-2.5-flash',GEMINI_API_KEY:'fake-unit-test-only'},agentPublicKey:keys.publicKey,fetchImpl:async()=>{calls++;throw Error('unexpected')}})
   const origin=await serve(server)
   try{
     const state=await(await fetch(origin+'/api/model-status')).json()
-    assert.equal(state.provider,'gemini');assert.equal(state.model,'gemini-2.5-flash');assert.equal(state.keyConfigured,true);assert.equal(calls,0)
+    assert.equal(state.provider,'local');assert.equal(state.processing,'self-hosted');assert.equal(calls,0)
+    const generation=await(await fetch(origin+'/api/scripts/generation-status')).json()
+    assert.equal(generation.provider,'gemini');assert.equal(generation.model,'gemini-2.5-flash');assert.equal(generation.keyConfigured,true)
     assert.equal(state.runtime.mode,'self-hosted-agent')
   }finally{await close(server)}
 })
@@ -94,7 +96,7 @@ test("backend-to-agent-to-loopback inference works without provider APIs",async(
     JSON.parse(Buffer.concat(chunks).toString())
     res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({concepts:[{term:'캐시',quote:'캐시는 결과를 저장한다.',explanation:'이전 결과를 보관해요.',sourceQuote:'캐시는 결과를 저장한다.'}]})}}]}))
   })
-  const modelOrigin=await serve(model),backend=createServer({env:{AI_EXECUTION_MODE:'agent'},agentPublicKey:keys.publicKey}),origin=await serve(backend)
+  const modelOrigin=await serve(model),backend=createServer({env:{AI_EXECUTION_MODE:'agent',AI_PROVIDER:'gemini',GEMINI_API_KEY:'fake-unit-test-only'},agentPublicKey:keys.publicKey,fetchImpl:async()=>{throw Error('External provider must not be called for coaching')}}),origin=await serve(backend)
   const agent=createAgentClient({backend:origin,privateKey:keys.privateKey,config:{textPort:Number(new URL(modelOrigin).port),voicePort:Number(new URL(modelOrigin).port)},runtime:{snapshot:()=>({textReady:true,transcriptionReady:true})}})
   try{
     agent.start()

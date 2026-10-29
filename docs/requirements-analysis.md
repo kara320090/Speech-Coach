@@ -1,5 +1,15 @@
 # 요구사항 분석서
 
+## 메인 분석 버튼의 자체 AI 전사 (2026-10-30)
+
+F16은 파일 불러오기와 함께 메인 녹화의 분석 버튼에서도 동작한다. `transcribe` 선택은 기본 켜짐이며 연습 설정에서 끌 수 있고, 이전에 비활성화됐던 브라우저 실시간 음성 인식 설정과 분리한다. 녹음·기본 결과를 IndexedDB에 먼저 저장한 뒤 소리만 `/api/transcribe`→운영 PC faster-whisper로 처리한다. 영상·얼굴·대본은 이 전사 요청에 포함하지 않는다. 전사 완료 후 기존 브라우저 계산으로 평균 속도·군말 후보·검토 위치를 만든다.
+
+처리 중에는 중복 분석·새 녹화를 막고 진행률과 취소를 제공한다. 전사문·결과를 같은 기록에 다시 저장한다. 서버 미준비·취소·부분 실패·인식된 말 없음은 미측정 이유를 표시하고 녹음·시간·침묵·시선 결과를 유지한다. 부분 전사문은 보존하지만 전체 속도·군말 수치로 사용하지 않는다. 10~13초 같은 짧은 녹음도 인식된 글이 있으면 평균 속도·군말 집계가 가능하고, 속도 변화 구간은 별도 최소 구간 기준을 따른다.
+
+## 2026-10-30 AI 처리 역할
+
+새 대본 생성(F22)은 `/create-script.html`·`POST /api/scripts/generate`에서 Gemini 3.8 Flash로 처리한다. 사용자가 입력한 주제·근거 자료만 전송하며, 초안 확인 후 기존 기록을 보존한 새 버전으로 저장한다. 기존 대본의 개념 분석·쉬운 표현 수정·질문·답변 검토는 Qwen, 음성 전사는 faster-whisper로 처리한다. 자체 AI와 Gemini의 상태·실패는 독립적이며 자동 공급자 대체는 없다. API·설정은 [역할 분리 명세](gemini-coach.md)를 따른다.
+
 **현재 구현 상태:** 자체 실행 텍스트 코칭과 음성 전사의 첫 구현이 추가됐다. 아래 전체 기획의 완료 조건과 구현된 부분은 [구현 범위](local-ai-implementation.md)에서 구분한다. 외부 AI Gateway와 브라우저 실시간 음성 인식은 제거/비활성화했다.
 
 
@@ -263,3 +273,7 @@ F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 �
 위 확장 경로는 목표 설계이며 현재는 `POST /api/coach`의 concepts/rewrite/question/review 분기로 묶었다. 상태는 `GET /api/model-status`, 전사는 같은 `POST /api/transcribe`에서 자체 worker를 호출한다. Gateway 호출과 키 읽기는 제거했다. 브라우저 실시간 음성 인식도 비활성화했다.
 
 현재 데이터는 별도 IndexedDB의 workspace에 script/sources/versionId/versions/attempts/question/concept/helpUsed/followups로 보관한다. Project·RequiredContent·ConditionTrial 등 전체 객체를 구현한 것은 아니다. 실제 필드·제약·오류와 단계별 미구현 범위는 [구현 범위](local-ai-implementation.md)에 기록했다.
+
+## 생성·코칭의 분리 인터페이스
+
+`GET /api/scripts/generation-status`는 생성 서비스, `GET /api/model-status`는 자체 AI 상태를 반환한다. 새 대본 요청은 task=generate·topic·sources·requestId·versionId만 허용한다. 생성 결과의 title·script·notes를 길이·형식 검사 후 사용자 검토 초안으로 반환한다. Gemini의 실패 상태·한도는 생성 서비스에만 적용한다.
