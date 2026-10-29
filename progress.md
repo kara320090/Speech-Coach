@@ -220,3 +220,10 @@
 - 배경(2026-10-30): 배포에서 `gemini-3.8-flash`로 '쉬운 대본 제안' 1회 실행 → "Gemini 서비스가 일시적으로 응답하지 않아요." 코드상 이 문구는 Google HTTP 5xx(504 제외)일 때만 나온다(우리 응답 503 `provider-unavailable`). 네트워크·시간 초과·응답 처리 문제는 아니다. 500/503 중 무엇인지는 당시 배포(`8b1ddd1`)에 진단 정보가 없어 미확인. PR #9(진단 `lastError`)는 CI 통과 후 병합(`0675a4e`).
 - 확인: `gemini-3.8-flash` 공식 모델 페이지는 thinking level low·medium·high만 지원하고 minimal(생각 끄기)은 오류라고 밝힌다. 기존 요청의 `thinkingBudget: 0`(생각 끄기)은 이와 맞지 않아 계열별 설정으로 바꿨다(2.5 Flash `thinkingBudget: 0`, 3.x `thinkingLevel: "low"`, 그 밖 미전송). 빈 문자열 enum은 공식 문서에 금지 문장이 없어 유지. temperature 1.0 권장은 비호환이 아니라 권장이라 유지하고 문서에 기록.
 - 확인한 것: `node --test` 140개 통과(새 1개). 네트워크 감시로 Google 요청 0건. 이 수정이 이번 5xx의 원인이었는지는 실제 재시험 전까지 단정하지 않는다.
+
+## 21. 검토 시점 ↔ 대본 문장 연결 API (브랜치 `feat/script-alignment`, 백엔드만)
+
+- 요청(2026-10-30): 영상·녹음의 검토 시점(예: 긴 침묵)을 앞뒤 전사 구간으로 대본 문장 근처에 연결해 AI 코칭에 넘길 수 있게 한다. 침묵만으로 원인을 판단하지 않는다. 기존 `practiceRange`(시간 비율 어림)는 발화를 보지 않아 재사용할 수 없었고, 문장 나누기 기준만 `splitSentences`와 맞췄다.
+- 구현: `server/script-align.js`(입력 검사·문장/문단과 원문 위치·정규화·글자 2-gram 유사도·Viterbi 단조 정렬과 forward-backward 후보·지점 연결·HTTP 처리기), `server.js`는 라우트만. 외부 AI 없음, 저장·로그 없음, 원문·기록 수정 없음. 결과는 matched/ambiguous/unmatched와 후보·근거·앞뒤 발화, `script-align-v1`. 문서: [docs/script-align-api.md](docs/script-align-api.md).
+- 확인한 것: `node --test` 155개 통과(새 13개, 실제 HTTP 포함 합성 사례). 네트워크 감시로 Google 요청 0건. 최대 작업량 합성 측정 약 0.2초·응답 약 400KB.
+- 한계: 합성 데이터만 확인했고 실제 발표 정확도는 검증하지 않았다. 숫자·영어 읽기 차이, 크게 바꿔 말하기, 여러 문장에 걸친 전사 구간에 약하다. 화면 연결 전.
