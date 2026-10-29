@@ -183,6 +183,7 @@ IndexedDB `speech-coach` / store `sessions`(keyPath `id`)에 세션을 저장한
 | `GET /vendor/mediapipe/*` | `vision_bundle.mjs`(JS), `wasm/vision_wasm_internal.{js,wasm}`(`application/wasm`), `face_landmarker.task`(octet-stream) | 시선 추적. 외부 CDN 없음 |
 | `GET /__health` | `{ status: "ok", releaseId }` | |
 | `POST /api/transcribe` | [영상 불러오기 문서](import-feature.md#서버-api-post-apitranscribe) | 키 없으면 503 |
+| `POST /api/scripts/import` | `multipart/form-data`의 `file` 1개(TXT·PDF·DOCX, 10MB) → `{ fileName, text }`, 오류는 `{ error, message }`. [대본 파일 API 문서](script-import-api.md) | 백엔드만 구현, 화면 연결 전 |
 
 공통 헤더: `Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; media-src 'self' blob:; img-src 'self' data:; connect-src 'self'; …`, `Permissions-Policy: microphone=(self), camera=(self)`. 인라인 `style` 속성은 막히므로 화면 코드는 `el.style.cssText`로 넣는다.
 
