@@ -77,14 +77,34 @@
 
 모든 오류 응답은 `{ error, message }`이고 메시지는 원문이 보존된다고 알린다(사용자 입력은 브라우저에 그대로 남는다). Google 오류 메시지 원문은 넘기지 않는다.
 
-## 6. 한계
+## 6. 모델 접근 점검과 오류 진단
+
+- **상태 API의 `lastError`**: 마지막 Gemini 오류를 `{ code, httpStatus, providerStatus, providerReason, at, hint }`로만 공개한다. `providerStatus`·`providerReason`은 Google의 대문자 열거 코드(예: `NOT_FOUND`, `API_KEY_INVALID`)만 허용 목록 방식으로 남기고, Google 메시지 원문·요청 내용·키·프로젝트 정보는 저장·공개·로그하지 않는다. `hint`는 우리가 쓴 안내 문장이다. 생성이 성공하면 지운다.
+- **모델 접근 점검(생성 없음)**: `npm run gemini:check-models [모델 ...]` — `models.get`(GET)으로 모델 정보만 조회해 `조회 가능/불가 · HTTP 상태 · Google 열거 코드 · generateContent 지원 여부`를 출력한다. 키는 `GEMINI_API_KEY` 환경변수나 화면에 보이지 않는 입력으로 받고 출력하지 않는다. 터미널에서 직접 실행한다(키를 명령줄·채팅에 붙여 넣지 않는다).
+  ```sh
+  npm run gemini:check-models gemini-2.5-flash gemini-3.8-flash gemini-3.5-flash-lite
+  ```
+- 조회 가능해도 **생성 호출이 된다는 보장은 아니다**(접근 제한이 생성 단계에서만 걸릴 수 있음). 무료로 쓸 수 있는지도 별개다.
+- `provider-model`(Google 404): 모델 이름이 틀렸거나 이 키의 프로젝트가 그 모델에 접근할 수 없다는 뜻이다. Google 모델 문서(2026-10-28 갱신)는 2.5 모델 접근을 “예전에 사용한 적 있는 사용자”로 제한한다고 밝힌다. 새 프로젝트에서는 2.5 모델이 404일 수 있다.
+
+### 공식 가격표의 무료 등급(2026-10-28 갱신, [pricing](https://ai.google.dev/gemini-api/docs/pricing))
+
+| 모델 | 무료 등급 입력·출력 | 유료 등급(100만 토큰당) | 무료 등급 데이터의 제품 개선 사용 |
+| --- | --- | --- | --- |
+| `gemini-2.5-flash` | Free of charge | 입력 $0.30 / 출력 $2.50 | 예 |
+| `gemini-3.8-flash` | Free of charge | 입력 $0.75 / 출력 $3.75(2027-01-01부터 $1.50 / $7.50) | 예 |
+| `gemini-3.5-flash-lite` | Free of charge | 입력 $0.30 / 출력 $2.50 | 예 |
+
+가격표에 무료 등급이 있다는 것이 **이 프로젝트에서 무료 호출이 된다는 뜻은 아니다**. 무료 한도(RPM·TPM·RPD)는 프로젝트 단위로 걸리고 공개 문서에 숫자가 없으며 Google AI Studio에서만 확인할 수 있다. 지역(유럽경제지역·스위스·영국은 유료 필요)과 2.5 접근 제한도 영향을 준다.
+
+## 7. 한계
 
 - 호출량 제한은 **서버 프로세스 메모리**에만 있다. 서버가 재시작·재배포되거나(무료 Render는 유휴 시 잠듦) 인스턴스가 여러 개면 초기화·분산되므로 **예산을 완전히 보장하지 못한다**. 실제 비용 상한은 Google 프로젝트의 결제·할당량 설정에서 걸어야 한다.
 - 요청자 구분은 `X-Forwarded-For` 첫 주소라 조작할 수 있다(보조 제한).
 - 구조화 출력과 인용 검증은 결과가 입력 문장을 인용했는지만 확인한다. 해석이 맞는지는 사람이 검토해야 한다.
 - 실제 Gemini 연결은 아직 실행하지 않았다(가짜 응답 검사만 통과). 실제 응답에서 스키마 거절(400)이나 출력 품질 문제가 나올 수 있다.
 
-## 7. 구조
+## 8. 구조
 
 | 파일 | 역할 |
 | --- | --- |
@@ -93,4 +113,5 @@
 | `server/remote-coach.js` | 외부 공급자 공통: 중복 방지·호출량 제한·쿨다운·상태·출력 검증 연결 |
 | `server/local-coach.js` | 자체 모델(기존). 입력 검사·프롬프트·출력 검증 규칙을 Gemini도 함께 쓴다 |
 | `tests/gemini-coach.test.mjs` | 가짜 Gemini 응답 검사(실제 호출 차단) |
-| `tests/live/gemini-live-check.mjs` | 수동 실제 연결 확인(`GEMINI_LIVE_TEST=1 npm run test:gemini-live`) |
+| `tests/live/gemini-live-check.mjs` | 수동 실제 연결 확인(`GEMINI_LIVE_TEST=1 npm run test:gemini-live`, 생성 1회) |
+| `tests/live/gemini-model-check.mjs` | 수동 모델 접근 점검(`npm run gemini:check-models`, 생성 없음) |

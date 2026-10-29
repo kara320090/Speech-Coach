@@ -199,3 +199,10 @@
 - 확인한 것: `node --test` 118개 통과(새 16개, 가짜 Gemini 응답만, 실제 API 호출 차단). E2E `coach-provider.spec.ts` 2개 통과.
 - 기존 문제(이번 변경과 무관): `e2e/media/coaching.spec.ts` 2개(rewrite 복원 문구, feedback cap 표시)가 main(`c283d1d`)에서도 같은 이유로 실패한다. 프론트 담당 확인 필요.
 - 확인하지 못한 것: 실제 Gemini 연결(키 미설정, 지시에 따라 미실행), Render 배포, 실제 응답의 스키마 수용·품질.
+
+## 19. Gemini `provider-model` 진단과 모델 접근 점검 (브랜치 `feat/gemini-diagnostics`, 모델 변경 전)
+
+- 배경(2026-10-30): 배포 프론트(https://speech-coach-public.vercel.app → Render)의 `/api/model-status`가 `connection: failed`, `reason: provider-model`(Google HTTP 404), `keyConfigured: true`. 호출 주소·버전·방식(`v1beta/models/gemini-2.5-flash:generateContent`, `x-goog-api-key`)은 공식 레퍼런스와 같다. Google 모델 문서는 2.5 모델 접근을 과거 사용자로 제한한다고 밝혀 가장 유력한 원인이지만, 키로 확인하기 전까지는 확정하지 않는다.
+- 조치: Google 오류의 HTTP 상태·열거 코드만 남기는 `providerDetail`, 상태 API `lastError`(정제 코드·안내만, 원문 메시지·키·요청 내용 없음), 생성 없는 `npm run gemini:check-models`(models.get). 모델·결제·생성 호출은 바꾸지 않았다.
+- 확인한 것: `node --test` 139개 통과(새 3개). 가짜 키를 넣고 전체 검사를 돌려도 Google 요청 0건(네트워크 감시). 키 없이 점검 명령을 실행하면 외부 요청 없이 끝남.
+- 남은 것: 사용자가 실제 키로 `npm run gemini:check-models gemini-2.5-flash gemini-3.8-flash gemini-3.5-flash-lite`를 실행해 결과 확인, 모델 결정.
