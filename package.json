@@ -9,6 +9,11 @@
     "test": "node --test"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "@fastify/busboy": "3.2.4",
+    "mammoth": "1.13.0",
+    "pdfjs-dist": "6.4.299"
   }
 }

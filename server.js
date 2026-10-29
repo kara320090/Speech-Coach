@@ -1,10 +1,11 @@
-// 외부 패키지 없이 public/ 폴더의 정적 파일, /__health, 글자 변환 중계(/api/transcribe)를 제공하는 서버.
+// public/ 폴더의 정적 파일, /__health, 글자 변환 중계(/api/transcribe), 대본 파일 글자 꺼내기(/api/scripts/import)를 제공하는 서버.
 // 녹음·영상·분석은 브라우저 안에서 처리한다. 사용자가 '글자로 변환'을 직접 켠 경우에만 영상에서 꺼낸 소리 조각(WAV)이
 // /api/transcribe를 거쳐 AI Gateway의 음성 인식 모델로 전송된다. 영상 파일 자체는 서버로 오지 않는다.
 import http from "node:http"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { createScriptImportHandler } from "./server/script-import.js"
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "public")
 const MIME = {
@@ -65,8 +66,9 @@ function cleanSegments(raw) {
   return out
 }
 
-export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch } = {}) {
+export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits } = {}) {
   let transcribedSeconds = 0
+  const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
   const totalLimit = Number(env.TRANSCRIBE_TOTAL_SECONDS) > 0 ? Number(env.TRANSCRIBE_TOTAL_SECONDS) : DEFAULT_TOTAL_SECONDS
 
   async function transcribe(req, res) {
@@ -126,6 +128,13 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
           return res.end()
         }
         return await transcribe(req, res)
+      }
+      if (url.pathname === "/api/scripts/import") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { Allow: "POST", ...HEADERS })
+          return res.end()
+        }
+        return await importScript(req, res)
       }
       if (req.method !== "GET" && req.method !== "HEAD") {
         res.writeHead(405, { Allow: "GET, HEAD", ...HEADERS })

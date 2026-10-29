@@ -137,3 +137,10 @@
 - 미디어 검사 실패 원인과 수정: 가짜 카메라에서 시선 추적 모델의 첫 판단(`detectForVideo`)이 초기화로 몇 초 동안 화면을 멈춰 녹화 중 시계가 건너뛰었다(예: 0:02 → 0:17). 기존 코드가 모델 불러오기는 녹화 전에 기다렸지만 첫 판단은 녹화 중에 했다. `GazeTracker.warmup()`을 추가해 녹화 전 준비 화면에서 한 번 돌리게 했다. 검사 내용은 바꾸지 않았다. 대본 쪽은 직접 고칠 때 ‘(불러온 뒤 수정함)’ 표시가 바로 바뀌지 않던 문제를 고쳤다.
 - 확인한 것(로컬, Chromium 헤드리스): `node --test` 58개 통과, 시나리오 S1–S4·S9 5개 통과, 미디어 검사 17개를 3회 반복해 51회 모두 통과.
 - 확인하지 못한 것: 실제 OS 파일 선택 창 조작, 읽는 중 표시(파일이 작아 바로 읽힘), Safari·Firefox, 실제 웹캠에서의 시선 추적 첫 판단 시간, 스크린 리더, Docker 빌드·CI·배포.
+
+## 16. 대본 파일 글자 꺼내기 API (브랜치 `feat/script-import-api`, 백엔드만)
+
+- 요청(2026-10-29): `POST /api/scripts/import`로 TXT(UTF-8)·PDF(글자 있음)·DOCX 파일 하나(`file` 필드, 10MB 이하)를 받아 `{ fileName, text }`를 돌려준다. 프론트 화면은 바꾸지 않고 [API 문서](docs/script-import-api.md)로 인계한다.
+- 구현: `server/script-import.js`(멀티파트 받기·형식·크기·파일 머리 확인·오류 응답), `server/extract-worker.js`(PDF·DOCX 해석, 문서마다 새 작업 스레드·힙 256MB·20초·PDF 300쪽 상한), `server.js`는 라우트 연결만. 라이브러리는 유지보수 중인 `@fastify/busboy` 3.2.4, `pdfjs-dist` 6.4.299, `mammoth` 1.13.0(정확한 버전 고정, `npm audit` 0건). `pdf-parse`는 그림용 네이티브 패키지가 따라와서 쓰지 않았다. 파일은 메모리에서만 다루고 저장·외부 전송·로그 기록을 하지 않는다. Dockerfile·render.yaml은 잠금 파일로 운영 패키지만 설치(`npm ci --omit=dev --omit=optional`), Node 22.13 이상.
+- 확인한 것: `node --test` 73개 통과(새 15개: 실제 포트에 멀티파트로 가상 TXT·PDF·DOCX 업로드, 한글·줄·문단 보존, 오류 17종, 자원 한도, 기존 서버 기능, 로그 미기록). Docker 이미지 빌드 성공, 컨테이너(Node 22.23.4)에서 curl로 TXT·PDF·DOCX 200, 암호 PDF·스캔 PDF·파일 없음 오류 확인, 컨테이너 로그에 파일 내용 없음, `/tmp`에 남은 파일 없음, 기존 `/`·`/import.html`·`/api/transcribe` 응답 유지.
+- 확인하지 못한 것: 실제 사용자 문서(워드·한글 프로그램에서 만든 DOCX, 다단·표가 많은 PDF, 실제 암호 PDF·DOCX)로 한 검사, 화면 연결, Render 배포, 동시 접속 부하.
