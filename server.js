@@ -10,6 +10,9 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "public")
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".wasm": "application/wasm",
+  ".task": "application/octet-stream",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
@@ -19,10 +22,10 @@ const MIME = {
 const HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
-  // 마이크·카메라는 이 사이트에서만 쓴다.
+  // 마이크·카메라는 이 사이트에서만 쓴다. 'wasm-unsafe-eval'은 시선 추적(자체 포함한 MediaPipe WebAssembly)에 필요하다.
   "Permissions-Policy": "microphone=(self), camera=(self)",
   "Content-Security-Policy":
-    "default-src 'self'; media-src 'self' blob:; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; media-src 'self' blob:; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
 }
 
 const NOT_FOUND_HTML = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>페이지를 찾을 수 없어요</title></head><body><main><h1>페이지를 찾을 수 없어요</h1><p><a href="/">발표 연습 코치 첫 화면으로 가기</a></p></main></body></html>`

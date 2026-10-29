@@ -10,6 +10,11 @@ export const REPEAT_WINDOW_SEC = 30
 export const REPEAT_MIN_COUNT = 3
 export const LIVE_SPEED_WINDOW_SEC = 20 // 실시간 속도는 최근 이 시간 기준
 export const MIN_SIGNAL_RMS = 0.003 // 이보다 작으면 마이크 소리가 거의 없는 것으로 본다
+export const FILLER_GAP_SEC = 8 // 군말이 이 시간 안에 이어서 나오면 한 구간으로 묶는다
+export const FILLER_PAD_SEC = 1 // 군말 구간 앞뒤로 이만큼 넓혀서 재생한다
+export const GAZE_MIN_SEC = 1.5 // 얼굴이 화면을 벗어난 상태가 이 시간 이상이면 '시선 이탈'
+// 군말(채움말) 후보. 인식 결과에서 빠지거나 다른 말로 바뀔 수 있어 사용자가 재생해서 확인한다.
+const FILLER_RE = /^(음+|으+음*|어+|엄+|저기|뭐지|그니까)$/
 
 /* ───────── 목표 시간과의 차이 ───────── */
 
@@ -229,9 +234,75 @@ export function analyzeTranscript(segments, durationSec) {
   return { status: "ok", totalSyllables, overallRate, meanWindowRate, windows, items }
 }
 
+/* ───────── 군말(음, 어) ───────── */
+
+/** 인식된 글에서 군말 후보를 찾아 FILLER_GAP_SEC 안에 이어진 것끼리 묶는다. */
+export function analyzeFillers(segments) {
+  const hits = []
+  for (const s of segments) {
+    const toks = tokenize(s.text)
+    toks.forEach((t, i) => {
+      if (FILLER_RE.test(t)) hits.push({ sec: s.startSec + (i / toks.length) * Math.max(0, s.endSec - s.startSec), word: t })
+    })
+  }
+  hits.sort((a, b) => a.sec - b.sec)
+  const clusters = []
+  for (const h of hits) {
+    const c = clusters[clusters.length - 1]
+    if (c && h.sec - c.end <= FILLER_GAP_SEC) {
+      c.end = h.sec
+      c.words.push(h.word)
+    } else clusters.push({ start: h.sec, end: h.sec, words: [h.word] })
+  }
+  const items = clusters.map((c) => {
+    const uniq = [...new Set(c.words)].slice(0, 3).join(", ")
+    return {
+      type: "filler",
+      title: `군말 ${c.words.length}회 (${uniq})`,
+      startSec: Math.max(0, c.start - FILLER_PAD_SEC),
+      endSec: c.end + FILLER_PAD_SEC,
+      basis: `"음·어" 같은 군말 후보가 ${FILLER_GAP_SEC}초 안에 이어서 인식됐어요. 인식이 빠지거나 틀릴 수 있으니 재생해서 확인해 주세요.`,
+      measured: `${formatClock(c.start)}부터 ${c.words.length}회`,
+    }
+  })
+  return { count: hits.length, times: hits.map((h) => h.sec), items }
+}
+
+/* ───────── 시선(얼굴 방향) ───────── */
+
+/**
+ * samples: [{ t, off }] — off는 true(얼굴이 없거나 크게 돌아감), false(화면을 봄), null(판단 못 함).
+ * off가 GAZE_MIN_SEC 이상 이어진 구간을 찾는다. 판단한 표본이 없으면 status "off".
+ */
+export function analyzeGaze(samples, durationSec, { minSec = GAZE_MIN_SEC } = {}) {
+  const known = samples.filter((s) => s.off !== null && s.off !== undefined)
+  if (!known.length) return { status: "off", segments: [], offSec: 0, items: [] }
+  const segments = []
+  let start = null
+  for (const s of known) {
+    if (s.off) {
+      if (start === null) start = s.t
+    } else if (start !== null) {
+      if (s.t - start >= minSec) segments.push({ startSec: start, endSec: s.t })
+      start = null
+    }
+  }
+  if (start !== null && durationSec - start >= minSec) segments.push({ startSec: start, endSec: durationSec })
+  const offSec = segments.reduce((a, g) => a + g.endSec - g.startSec, 0)
+  const items = segments.map((g) => ({
+    type: "gaze",
+    title: "시선 이탈",
+    startSec: g.startSec,
+    endSec: g.endSec,
+    basis: `얼굴이 화면에서 벗어났거나 크게 돌아간 상태가 ${minSec}초 이상 이어졌어요. 대본·메모를 본 것일 수 있어요.`,
+    measured: `${(g.endSec - g.startSec).toFixed(1)}초 (${formatClock(g.startSec)}~${formatClock(g.endSec)})`,
+  }))
+  return { status: "ok", segments, offSec, items }
+}
+
 /* ───────── 검토할 구간 모으기 ───────── */
 
-export function buildReviewItems({ silence, transcript, sectionRows = [], toleranceSec = 0 }) {
+export function buildReviewItems({ silence, transcript, sectionRows = [], toleranceSec = 0, fillers = null, gaze = null }) {
   const items = []
   if (silence?.status === "ok") {
     for (const s of silence.segments) {
@@ -246,6 +317,8 @@ export function buildReviewItems({ silence, transcript, sectionRows = [], tolera
     }
   }
   if (transcript?.status === "ok") items.push(...transcript.items)
+  if (fillers) items.push(...fillers.items)
+  if (gaze?.status === "ok") items.push(...gaze.items)
   const tol = Math.max(0, Math.round(toleranceSec))
   for (const r of sectionRows) {
     if (r.actualSec === null || r.startSec === null) continue
@@ -312,4 +385,29 @@ export function compareSessions(prev, cur) {
     rows.push({ label: `구간 '${r.title}' 실제 시간`, prev: sec(p.actualSec), cur: sec(r.actualSec), delta: formatSigned(r.actualSec - p.actualSec) })
   }
   return rows
+}
+
+/**
+ * 한 연습의 [from, to] 구간 측정값. 다시 연습한 구간과 원래 구간을 나란히 비교할 때 쓴다.
+ * session: 저장된 연습(transcript·analysis·media). 측정하지 못한 값은 null.
+ */
+export function windowMetrics(session, from, to) {
+  const len = Math.max(1, to - from)
+  const ov = (a, b) => Math.max(0, Math.min(b, to) - Math.max(a, from))
+  const a = session.analysis || {}
+  const speechOk = session.media?.speech === "ok"
+  let syl = 0
+  for (const s of session.transcript || []) {
+    const n = countSyllables(s.text)
+    const d = s.endSec - s.startSec
+    if (d <= 0) syl += s.startSec >= from && s.startSec <= to ? n : 0
+    else syl += (n * ov(s.startSec, s.endSec)) / d
+  }
+  const fillerTimes = a.fillers?.times || []
+  return {
+    rate: speechOk ? Math.round((syl / len) * 60) : null,
+    fillersPerMin: speechOk ? Math.round((fillerTimes.filter((t) => t >= from && t <= to).length / len) * 600) / 10 : null,
+    pauses: a.silence?.status === "ok" ? (a.items || []).filter((it) => it.type === "silence" && ov(it.startSec, it.endSec) > 0).length : null,
+    gazePct: a.gaze?.status === "ok" ? Math.round(((a.gaze.segments || []).reduce((n, g) => n + ov(g.startSec, g.endSec), 0) / len) * 100) : null,
+  }
 }
