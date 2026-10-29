@@ -10,7 +10,7 @@
 import { MediaCapture } from "./recorder.js"
 import { analyzeSilence, buildReviewItems, classifyResult, conditionKey, windowMetrics } from "./analysis.js"
 import { analyzeRecordedSpeech } from "./recording-analysis.js"
-import { saveSession } from "./storage.js"
+import { getSession, saveSession } from "./storage.js"
 import { checkRevision } from "./content-check.js"
 import { formatClock, formatKorean, pad2 } from "./time.js"
 
@@ -476,6 +476,7 @@ const coachItems = (session) => [...(session?.analysis?.items || []), ...(sessio
 
 async function reviewManualPoint() {
   if (!state.session || state.analysis.running) return
+  if (!state.session.script?.trim()) { state.importError = "대본이 없는 기록이에요. 영상과 함께 대본을 입력해 다시 불러와 주세요."; return render() }
   const sec = Math.max(0, Math.min(state.session.totalSec, Number(state.manualSecond) || 0))
   const item = { id: `manual-${Date.now()}`, type: "manual", startSec: sec, endSec: sec, title: "직접 고른 검토 시점", measured: "사용자가 직접 선택 (측정 이상 아님)", basis: "사용자가 다시 보고 싶은 시점을 직접 골랐어요." }
   state.session.reviewPoints = [item]
@@ -738,7 +739,9 @@ function prepareScreen() {
         ),
       ),
     ),
-    h("div", { class: "screen-actions" }, h("span", { text: "대본은 연습을 시작한 시점의 버전으로 기록됩니다." }), next),
+    h("div", { class: "screen-actions" },
+      h("a", { class: "button button--soft", href: "/import.html?return=studio", text: "녹화된 영상 불러오기" }),
+      h("span", { text: "대본은 연습을 시작한 시점의 버전으로 기록됩니다." }), next),
   )
 }
 
@@ -887,6 +890,10 @@ function resultsScreen() {
       ),
     ),
     noticeList(s),
+    s.analysis.blink && h("div", { class: "card manual-review", "aria-label": "영상 얼굴 측정 결과" },
+      h("h2", { text: "영상 눈 깜빡임 측정" }),
+      h("p", { "data-testid": "studio-blink-status", text: s.analysis.blink.status === "ok" ? `총 ${s.analysis.blink.count}회 · 얼굴 측정 시간 ${s.analysis.blink.observedSec.toFixed(1)}초 · 분당 ${s.analysis.blink.rate.toFixed(1)}회` : `측정 못 함 — ${s.analysis.blink.reason}` }),
+      h("p", { text: "실제 영상 프레임을 이 기기에서 MediaPipe로 분석했어요. 깜빡임 횟수로 이해도나 감정을 판단하지 않아요." })),
     !state.analysis.running && h("div", { class: "card manual-review" },
       h("h2", { text: "직접 검토할 시점 선택" }),
       h("p", { text: "자동으로 잡힌 구간이 없어도 다시 보고 싶은 시점을 고를 수 있어요. 직접 선택한 위치는 측정 이상으로 취급하지 않아요." }),
@@ -1509,7 +1516,7 @@ function render() {
     root.replaceChildren(onboarding())
     return
   }
-  root.replaceChildren(h("div", { class: "app-shell" }, appHeader(), stageRail(), h("main", { class: "main-content" }, SCREENS[state.stage]()), mobileNav()))
+  root.replaceChildren(h("div", { class: "app-shell" }, appHeader(), stageRail(), h("main", { class: "main-content" }, state.importError && h("p", { class: "coach-error", role: "alert", text: state.importError }), SCREENS[state.stage]()), mobileNav()))
   if (keep?.label) {
     const el = root.querySelector(`[aria-label="${CSS.escape(keep.label)}"]`)
     if (el && !el.disabled) {
@@ -1535,6 +1542,24 @@ window.addEventListener("beforeunload", (e) => {
 window.addEventListener("pagehide", () => releaseCamera())
 navigator.mediaDevices?.addEventListener?.("devicechange", () => refreshDevices().then(() => state.stage === "prepare" && render()))
 
+async function restoreImportedSession() {
+  const id = new URLSearchParams(location.search).get("session")
+  if (!id) return
+  const imported = await getSession(id)
+  if (!imported) { state.importError = "불러온 연습 기록을 찾지 못했어요. 같은 브라우저에서 다시 불러와 주세요."; return }
+  state.session = imported
+  state.script = typeof imported.script === "string" ? imported.script : ""
+  state.evidence = imported.sources || ""
+  state.scriptSource = "import"
+  if (!imported.scriptVersionId) imported.scriptVersionId = currentVersionId("import")
+  if (!state.versions.some(v => v.id === imported.scriptVersionId)) state.versions.push({ id: imported.scriptVersionId, script: state.script, createdAt: imported.createdAt, from: "import" })
+  state.onboarding = false; state.stage = "results"; state.maxReached = 2
+  savePrefs()
+  if (state.script.trim()) await alignSession(imported)
+  else state.align = { status: "none" }
+}
+
 refreshDevices().then(render)
 loadModelStatus().then(render)
+restoreImportedSession().then(render).catch(() => { state.importError = "불러온 기록을 열지 못했어요. 파일을 다시 선택해 주세요."; render() })
 render()

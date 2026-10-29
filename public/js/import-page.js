@@ -2,10 +2,12 @@
 import { TARGET_RATE, encodeWav } from "./wav.js"
 import { analyzeFillers, analyzeSilence, analyzeTranscript, buildReviewItems, classifyResult, conditionKey } from "./analysis.js"
 import { decodeToMono16k, planChunks, transcribeChunks, MAX_FILE_BYTES } from "./importer.js"
+import { scriptVersionIdFor } from "./segment-flow.js"
 import { saveSession } from "./storage.js"
 import { analyzeVideoBlinks, readVideoDuration } from "./video-analysis.js"
 
 const app = document.getElementById("app")
+const returnToStudio = new URLSearchParams(location.search).get("return") === "studio"
 
 function h(tag, props, ...kids) {
   const e = document.createElement(tag)
@@ -51,13 +53,27 @@ function readInputs(form, file) {
   }
   const tol = num("tol") ?? 0
   if (!Number.isInteger(tol) || tol < 0) errs.push("허용 오차는 0 이상의 정수(초)로 적어 주세요.")
-  return { errs, targetSec, tol, wantBlink: form.querySelector("#f-blink").checked, wantText: form.querySelector("#f-text").checked, raw: { tmin: form.querySelector("#f-tmin").value, tsec: form.querySelector("#f-tsec").value, tol: String(tol) } }
+  const script = form.querySelector("#f-script").value
+  const sources = form.querySelector("#f-sources").value
+  if (script.length > 20000) errs.push("대본은 2만 자 이하로 나눠 주세요.")
+  if (sources.length > 2400) errs.push("근거 자료는 2,400자 이하로 적어 주세요.")
+  return { script, sources, errs, targetSec, tol, wantBlink: form.querySelector("#f-blink").checked, wantText: form.querySelector("#f-text").checked, raw: { tmin: form.querySelector("#f-tmin").value, tsec: form.querySelector("#f-tsec").value, tol: String(tol) } }
 }
 
 function renderForm() {
   const errors = h("div", { class: "errors", role: "alert", hidden: true })
   const file = h("input", { id: "f-file", type: "file", accept: "video/*,audio/*,.mp4,.m4a,.mp3,.wav,.webm,.mov" })
   const text = h("input", { id: "f-text", type: "checkbox" })
+  let draft = {}
+  if (returnToStudio) { try { draft = JSON.parse(localStorage.getItem("dasibom.studio") || "{}") } catch {} }
+  const modelState = h("p", { class: "info", id: "import-model-state", "data-ai-ready": "pending", role: "status" }, "음성 인식 연결을 확인하고 있어요…")
+  fetch("/api/model-status", { signal: AbortSignal.timeout(10000) }).then(async res => {
+    if (!res.ok) throw Error()
+    const info = await res.json()
+    const ready = info.transcriptionConfigured && info.runtime?.transcriptionReady !== false
+    modelState.dataset.aiReady = String(Boolean(ready))
+    modelState.textContent = ready ? "음성 인식이 설정돼 있어요. 글자 변환을 선택하면 소리만 전송하며 API 사용량이 발생해요." : "AI 미설정: 글자 변환 없이도 로컬 소리·눈 깜빡임 분석은 가능해요."
+  }).catch(() => { modelState.dataset.aiReady = "false"; modelState.textContent = "음성 인식 상태를 확인하지 못했어요. 글자 변환 없이 로컬 분석할 수 있어요." })
   const form = h(
     "form",
     { novalidate: true },
@@ -82,10 +98,18 @@ function renderForm() {
       ),
       h("p", { class: "hint" }, "불러온 파일의 길이를 총 연습 시간으로 보고 목표와 비교해요."),
     ),
+    h("fieldset", null,
+      h("legend", null, "영상의 대본·근거 자료 (선택)"),
+      h("label", { for: "f-script" }, "영상 대본"),
+      h("textarea", { id: "f-script", class: "input", rows: "5", maxlength: "20000", value: draft.script || "", "aria-label": "영상 대본" }),
+      h("label", { for: "f-sources" }, "근거 자료"),
+      h("textarea", { id: "f-sources", class: "input", rows: "2", maxlength: "2400", value: draft.evidence || "", "aria-label": "근거 자료" }),
+      h("p", { class: "hint" }, "영상에서 말한 대본을 넣으면 분석 후 스튜디오에서 문장 위치를 확인하고 AI와 대화할 수 있어요. 내용과 원음을 직접 대조해 주세요.")),
     h(
       "fieldset",
       null,
       h("legend", null, "글자 변환 (선택)"),
+      modelState,
       h("div", { class: "check" }, text, h("label", { for: "f-text" }, "글자로도 바꿔서 말하기 속도·반복 표현 분석")),
       h(
         "p",
@@ -163,7 +187,7 @@ async function run(file, input) {
       segments = res.segments
       transcript = analyzeTranscript(segments, total)
       speechState = transcript.status === "ok" ? "ok" : "no-text"
-      notices.push("소리 조각을 자체 음성 인식 서버에서 글자로 바꿨어요.")
+      notices.push("소리 조각을 서버에 설정된 음성 인식으로 글자로 바꿨어요. 오인식이 있을 수 있어요.")
     } else {
       speechState = "error"
       notices.push(
@@ -203,6 +227,9 @@ async function run(file, input) {
     media: { audio: samples.length ? "ok" : "off", video: isVideo ? "ok" : "off", speech: speechState, speechDetail: "" },
     analysis: { silence: { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio }, transcript, blink, fillers: fillers && { count: fillers.count, times: fillers.times }, gaze: { status: "off" }, items },
     transcript: segments,
+    script: input.script,
+    sources: input.sources,
+    scriptVersionId: input.script ? await scriptVersionIdFor(input.script) : null,
     audioBlob: samples.length ? encodeWav(samples, TARGET_RATE) : null,
     videoBlob: isVideo ? file : null,
     notices,
@@ -211,7 +238,7 @@ async function run(file, input) {
   const saved = await saveSession(session)
   if (!saved.ok) session.notices.push(`기록을 이 기기에 저장하지 못했어요 (${saved.error}). 이 화면을 닫으면 다시 볼 수 없어요.`)
   if (!saved.ok) return renderFailure(`기록을 이 기기에 저장하지 못해서 결과 화면으로 넘어갈 수 없어요 (${saved.error}).`)
-  location.href = `/#/result/${session.id}`
+  location.href = returnToStudio ? `/studio.html?session=${encodeURIComponent(session.id)}` : `/#/result/${session.id}`
 }
 
 renderForm()
