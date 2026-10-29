@@ -6,7 +6,8 @@
   "description": "발표 연습 코치: 연습 중 시간·속도 안내와 연습 후 검토 구간 표시",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:gemini-live": "node tests/live/gemini-live-check.mjs"
   },
   "engines": {
     "node": ">=22.13"

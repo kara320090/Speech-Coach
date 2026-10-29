@@ -40,6 +40,7 @@ async function refreshModel() {
     const response = await fetch("/api/model-status")
     const info = await response.json(); ready = info.ready === true
     $("model-state").textContent = info.message || "모델 상태를 확인하지 못했어요."
+    if (info.processingNotice) $("processing-note").textContent = info.processingNotice
   } catch { ready = false; $("model-state").textContent = "서버에 연결하지 못했어요. 자료 저장·직접 수정은 계속할 수 있어요." }
   controls()
 }
@@ -53,7 +54,7 @@ async function run(task, onResult) {
   const token = ++generation, versionId = state.versionId, requestId = id()
   const snapshot = { task, requestId, versionId, script: state.script, sources: state.sources, answer: $("answer").value.trim(), question: state.question }
   const selected = { concept: state.concept, helpUsed: state.helpUsed }
-  controller = new AbortController(); controls(); status("직접 운영하는 모델이 자료를 확인하고 있어요. 취소할 수 있어요.")
+  controller = new AbortController(); controls(); status("AI 모델이 자료를 확인하고 있어요. 취소할 수 있어요.")
   try {
     const response = await fetch("/api/coach", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snapshot), signal: controller.signal })
     const body = await response.json()

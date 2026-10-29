@@ -191,3 +191,11 @@
 - 확인한 것: `node --test` 73개 통과(새 15개: 실제 포트에 멀티파트로 가상 TXT·PDF·DOCX 업로드, 한글·줄·문단 보존, 오류 17종, 자원 한도, 기존 서버 기능, 로그 미기록). Docker 이미지 빌드 성공, 컨테이너(Node 22.23.4)에서 curl로 TXT·PDF·DOCX 200, 암호 PDF·스캔 PDF·파일 없음 오류 확인, 컨테이너 로그에 파일 내용 없음, `/tmp`에 남은 파일 없음, 기존 `/`·`/import.html`·`/api/transcribe` 응답 유지.
 - 확인하지 못한 것: 실제 사용자 문서(워드·한글 프로그램에서 만든 DOCX, 다단·표가 많은 PDF, 실제 암호 PDF·DOCX)로 한 검사, 화면 연결, Render 배포, 동시 접속 부하.
 - 2026-10-29 밤 추가: PR #7(TXT·PDF·DOCX 글자 꺼내기 API)이 올라와 solution_paths의 보류 경로를 "PPTX·OCR·슬라이드 조작"으로 좁히고 PDF·DOCX는 구현(화면 연결 전)으로 적었다. 캔버스 재생성.
+
+## 18. 텍스트 AI 코치 Gemini 연결 (브랜치 `feat/gemini-coach-api`, 실제 호출 전)
+
+- 요청(2026-10-30): 배포 사이트에서 `/api/coach`(개념·대본 수정·질문·답변 검토)를 Gemini `gemini-2.5-flash`로 실행. 자체 모델은 보존하고 `AI_PROVIDER=local|gemini`로 선택. 실제 API 호출과 main 병합은 아직 하지 않는다.
+- 구현: `server/coach-provider.js`(공급자 선택), `server/gemini-client.js`(REST `models.generateContent`, `x-goog-api-key`, `responseJsonSchema` 구조화 출력, `thinkingBudget: 0`, 오류 분류), `server/remote-coach.js`(중복 방지·분당·일일·요청자별·동시 한도, 429 쿨다운, 재시도 없음, 상태의 키 있음/연결 확인 구분). 입력 검사·프롬프트·출력 검증은 `server/local-coach.js` 규칙을 그대로 쓴다. `server.js`는 공급자 선택·요청자 구분·`Retry-After`만 추가. 화면은 `coach.html`·`coach-page.js`의 처리 안내 문구만 상태의 `processingNotice`로 바꾸게 했다(`app.js`·공통 CSS 변경 없음). `render.yaml`에 `AI_PROVIDER=gemini`·`GEMINI_MODEL`·`GEMINI_API_KEY(sync:false)`, `docker-compose.yml`은 기본 `local`. 문서: [docs/gemini-coach.md](docs/gemini-coach.md).
+- 확인한 것: `node --test` 118개 통과(새 16개, 가짜 Gemini 응답만, 실제 API 호출 차단). E2E `coach-provider.spec.ts` 2개 통과.
+- 기존 문제(이번 변경과 무관): `e2e/media/coaching.spec.ts` 2개(rewrite 복원 문구, feedback cap 표시)가 main(`c283d1d`)에서도 같은 이유로 실패한다. 프론트 담당 확인 필요.
+- 확인하지 못한 것: 실제 Gemini 연결(키 미설정, 지시에 따라 미실행), Render 배포, 실제 응답의 스키마 수용·품질.
