@@ -1,6 +1,6 @@
 # 주최 측 Vercel AI Gateway 공급자
 
-`AI_PROVIDER=gateway`일 때 서버의 모든 AI 호출을 주최 측 Vercel AI Gateway로 보낸다. 팀원 PC 에이전트·자체 모델·Google 직접 API에 의존하지 않는다. Node 직접 실행의 기본값(`AI_PROVIDER` 미설정·`local`)은 유지한다. Docker Compose는 채점 환경을 위해 기본 공급자를 `gateway`로 지정한다.
+`AI_PROVIDER=gateway`일 때 서버의 모든 AI 호출을 주최 측 Vercel AI Gateway로 보낸다. 팀원 PC 에이전트·자체 모델·Google 직접 API에 의존하지 않는다. Node 직접 실행의 기본값(`AI_PROVIDER` 미설정·`local`)은 유지한다. Docker Compose와 `render.yaml`은 기본 공급자를 `gateway`로 지정한다.
 
 ## 참고한 공식 문서
 - OpenAI 호환 Chat Completions: https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions
@@ -33,6 +33,14 @@ API 요청·응답 계약은 그대로다. 전사 결과는 기존 `{ text, segm
 | `TRANSCRIBE_TOTAL_SECONDS` | Gateway 전사 누적 길이 상한. 코드 단독 기본 1800초, Docker Compose 기본 3600초(환경변수로 변경 가능) |
 
 Docker Compose: 주최 측이 `AI_GATEWAY_API_KEY`만 전달해도 `docker compose up --build`로 Gateway를 사용한다. 자체 모델이 필요한 개발자는 `AI_PROVIDER=local`로 명시한다. 키가 없으면 다른 모델로 우회하지 않고 AI 미설정 상태를 반환한다. 키는 compose 파일에 적지 않고 `${AI_GATEWAY_API_KEY}`로만 전달한다. Render 등 배포 서버는 대시보드 비밀 환경변수로 설정한다.
+
+## Render 배포 설정
+
+`render.yaml`은 `AI_PROVIDER=gateway`, `AI_GATEWAY_TEXT_MODEL=google/gemini-3.8-flash`, `AI_GATEWAY_TRANSCRIBE_MODEL=google/gemini-3.5-transcribe`를 지정한다. `AI_GATEWAY_API_KEY`의 실제 값은 저장소에 넣지 않고 Render Environment에서 입력한다.
+
+기존 Render 서비스의 대시보드 환경변수가 예전 `local`로 남아 있을 수 있다. 파일 수정·머지 자체를 운영 전환 완료로 간주하지 않는다. 서비스 Environment에서 위 값과 키 설정을 확인하고 저장·재배포한 뒤 상태 API로 적용 여부를 확인한다. Gateway 선택 시 기존 `AI_EXECUTION_MODE=agent` 값이 남아 있어도 서버는 PC 에이전트를 사용하지 않는다.
+
+브라우저에서 `https://speech-coach-public.vercel.app/api/model-status`를 열어 `provider: "ai-gateway"`, `keyConfigured: true`, `transcription.provider: "ai-gateway"`를 확인한다. 상태 조회는 생성·전사를 호출하지 않으며 사용량을 소모하지 않는다. `connection: "unverified"`는 실제 성공 여부가 아직 확인되지 않은 것이며 설정 실패와 구분한다. 텍스트와 전사의 연결 상태도 별개다.
 
 ## 상태 확인
 `GET /api/model-status`(생성 요청 없음)는 기능별로 `provider: "ai-gateway"`, `model`, `keyConfigured`(키가 있음), `connection`(`unverified` → 실제 요청 성공 시 `verified`, 인증·크레딧·모델 오류 시 `failed`), 마지막 오류 코드, 누적 사용량(요청 수·토큰·전사 초)을 보여준다. 키 값·본문은 넣지 않는다. 키가 없으면 AI 기능은 "AI가 설정되지 않음" 안내를 돌려주고, 자료 저장·직접 수정·로컬 분석은 계속 쓸 수 있다.
