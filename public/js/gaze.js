@@ -54,6 +54,21 @@ export class GazeTracker {
     return this.status
   }
 
+  /**
+   * 첫 판단은 모델 초기화(셰이더·wasm 준비) 때문에 몇 초씩 화면을 멈출 수 있다.
+   * 녹화 전에 한 번 미리 돌려 두면 녹화 중 시계가 건너뛰지 않는다. 여러 번 불러도 한 번만 한다.
+   */
+  async warmup(video) {
+    if (this.warmed || this.status !== "ready" || !video) return
+    if (video.readyState < 2) await new Promise((r) => {
+      video.addEventListener("loadeddata", r, { once: true })
+      setTimeout(r, 2000)
+    })
+    if (video.readyState < 2) return
+    this.sample(video)
+    this.warmed = true
+  }
+
   /** 지금 영상 프레임 기준 true/false. 판단할 수 없으면 null. */
   sample(video) {
     if (this.status !== "ready" || !video || video.readyState < 2) return null

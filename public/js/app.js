@@ -10,6 +10,8 @@ import { CONDITIONS, QUESTION_LIMIT, REASONS, expectedSentence, keywordsOf, prac
 import { GazeTracker } from "./gaze.js"
 import { MediaCapture, SpeechCapture } from "./recorder.js"
 import { deleteSession, getSession, listSessions, saveSession } from "./storage.js"
+import { sessionScript } from "./script.js"
+import { createScriptImport } from "./script-ui.js"
 
 const app = document.getElementById("app")
 const SETTINGS_KEY = "dasibom.settings"
@@ -107,6 +109,22 @@ const state = {
   hud: null,
 }
 const saveRaw = () => store.set(SETTINGS_KEY, JSON.stringify(state.raw))
+// 대본 TXT 불러오기. 불러온 파일명은 state.raw.scriptFile({ name, edited })에 따로 둔다.
+// 예시 대본 그대로이거나 비어 있으면 바로 바꾸고, 직접 쓰거나 불러온 대본이 있으면 먼저 묻는다.
+const scriptImport = createScriptImport({
+  needsConfirm: (text) => Boolean(state.raw.script?.trim()) && state.raw.script !== SAMPLE_SCRIPT && state.raw.script !== text,
+  apply: (name, text) => {
+    state.raw.script = text
+    state.raw.scriptFile = { name, edited: false }
+    saveRaw()
+  },
+  getFile: () => state.raw.scriptFile || null,
+  onChange: () => renderScript(),
+})
+function scriptEdited() {
+  if (state.raw.scriptFile) state.raw.scriptFile = state.raw.script.trim() ? { ...state.raw.scriptFile, edited: true } : null
+  scriptImport.refresh()
+}
 const busy = () => ["starting", "countdown", "recording", "saving"].includes(state.phase)
 
 /* ───────── 화면 뼈대 ───────── */
@@ -398,9 +416,9 @@ function renderScript() {
   )
   let body
   if (state.editing) {
-    const ta = h("textarea", { class: "input script-edit", "aria-label": "대본", oninput: (e) => ((state.raw.script = e.target.value), saveRaw()) })
+    const ta = h("textarea", { class: "input script-edit", "aria-label": "대본", oninput: (e) => ((state.raw.script = e.target.value), scriptEdited(), saveRaw()) })
     ta.value = state.raw.script
-    body = [ta, h("p", { class: "hint" }, "문장 단위(마침표·줄바꿈)로 나눠서 보여줘요.")]
+    body = [scriptImport.render(b), ta, h("p", { class: "hint" }, "문장 단위(마침표·줄바꿈)로 나눠서 보여줘요.")]
   } else body = sents.length ? h("ol", { class: "sentences" }, items) : h("p", { class: "hint" }, "대본이 비어 있어요. '대본 편집'을 눌러 붙여 넣으세요. 대본 없이도 녹화할 수 있어요.")
   put(scriptCol, 
     h(
@@ -510,7 +528,7 @@ class Practice {
 }
 
 async function startRecording() {
-  if (busy()) return
+  if (busy() || scriptImport.busy()) return
   const { settings, errors } = readSettings(state.raw)
   state.errors = errors
   if (errors.length) return render()
@@ -527,6 +545,7 @@ async function startRecording() {
   }
   await initCamera()
   if (state.gaze.status === "loading") await state.gaze.load() // 모델 준비 중 화면이 멈춰 시계가 건너뛰지 않게 녹화 전에 마친다
+  if (state.media.cam === "ready") await state.gaze.warmup(liveVideo) // 첫 판단의 초기화 멈춤도 녹화 전에 끝낸다
   const { capture, status } = state.media
   const notices = capture ? [] : [...state.media.notices]
   if (!capture && !notices.length) notices.push("마이크·웹캠을 쓸 수 없어 녹음 없이 시간만 측정해요.")
@@ -743,6 +762,7 @@ async function analyze() {
       gaze: { status: gaze.status, segments: gaze.segments, offSec: gaze.offSec }, items,
     },
     script: state.raw.script,
+    scriptFile: state.raw.scriptFile ? { name: state.raw.scriptFile.name, edited: Boolean(state.raw.scriptFile.edited) } : null,
     conds: { keywords: Boolean(state.raw.keywords), progress: Boolean(state.raw.progress), countdown: Boolean(ctx?.conds.includes("countdown")) },
     practiceOf: ctx ? { baseId: ctx.baseId, itemId: ctx.item.id, title: ctx.item.title, startSec: ctx.item.startSec, endSec: ctx.item.endSec, reason: ctx.reason, conds: ctx.conds } : null,
     coaching: {},
@@ -1049,6 +1069,13 @@ async function fillPracticeCompare(session, host) {
 }
 
 function againSameCondition() {
+  // 그 기록의 대본으로 다시 연습한다. 대본이 저장되지 않은 이전 기록이면 지금 대본을 그대로 쓴다.
+  const { text, fileName } = sessionScript(state.session)
+  if (text !== null) {
+    state.raw.script = text
+    state.raw.scriptFile = fileName ? { name: fileName, edited: Boolean(state.session.scriptFile.edited) } : null
+    saveRaw()
+  }
   clearSession()
   state.phase = "idle"
   state.errors = []
