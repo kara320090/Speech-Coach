@@ -11,6 +11,8 @@
 | 수정 효과를 다시 확인해야 함 | 원문·수정안·재연습을 같은 항목 ID로 연결 | F6, F10–F11 | 조건이 다른 연습의 지표를 개선으로 단정하지 않음 |
 | 필수 설명이 삭제될 위험 | 필수 항목·수치·조건·부정 의미 대조 | F7, F10 | 사용자 경험으로 확인된 사실이 아닌 설계상 위험 관리 |
 | 설치형 앱을 원하지 않음 | 브라우저 녹음·편집·결과 제공 | 전 기능 | 사용자 설치를 요구하지 않는 웹 구조 |
+| 반복 표현의 이유를 측정만으로 알 수 없음 | 관찰 교정·짧은 상황 질문·미확인 상태 | F13 | 사용자 설명은 인과 증명의 결과가 아님 |
+| 하지 말라는 지시만으로 준비 조건을 바꾸기 어려움 | 선택 가능한 단서·화면·구간 연습과 조건 시험 | F14, F11 | 효과 없음·악화·부담도 함께 기록 |
 
 ## 2. 현재 구현 구조
 
@@ -40,6 +42,8 @@
 4. 사용자가 외부 AI 처리를 선택하면 필요한 텍스트만 서버를 통해 보낸다. 원본 음성·영상은 기본 전송 대상이 아니다.
 5. 서버는 구조화된 수정안과 내용 보존 검사 결과를 반환한다. 브라우저가 형식·버전 일치·필수 항목 ID를 검사한다.
 6. 사용자가 선택한 제안을 새 대본 버전으로 저장하고 재연습에서 수정 항목을 대조한다.
+
+결과에서 문장 수정으로 곧바로 이동할 필요는 없다. F13에서 관찰·사용자 설명을 확인하고 F14에서 조건 하나를 선택해 F11로 재연습한다. 초기 질문·조건 편집은 로컬 규칙으로 처리할 수 있다. 선택적 AI 제안의 전송·API는 별도 구현 전 현재 제공 기능으로 표기하지 않는다.
 
 AI 공급자·모델·배포 환경은 미정이다. 외부 AI를 쓰기 전 전송 안내·동의, 비용 제한, 타임아웃, 입력 크기 제한, 요청 중복 방지를 구현한다. 사용자의 수정안 선택은 제품 동작이며 매번 채팅으로 승인을 받는 절차가 아니다.
 
@@ -79,6 +83,16 @@ AI 공급자·모델·배포 환경은 미정이다. 외부 AI를 쓰기 전 전
 
 목표·필수 항목이 바뀌면 측정값을 참고용으로 나열할 수는 있지만 동일 조건 개선 판정은 하지 않는다. `resolved / unresolved / uncertain`은 자동 분석 상태이고 `confirmed / dismissed / unreviewed`는 사용자 확인 상태로 별도 저장한다.
 
+### 4.5 원인 질문과 조건 시험
+
+F13은 `observationPending → confirmed/corrected/dismissed`와 `unasked → userReported/unknown/skipped`를 별도로 기록한다. 자동 인식만으로 원인을 채우지 않는다. 기본 질문 상한은 항목당 3개이며, 답을 모르면 종료·옵션 선택으로 이동한다. 상세 문구는 [코칭 설계](coaching-design.md)를 따른다.
+
+F14는 `proposed → selected → applied → rehearsed → reviewed` 흐름이고 어느 단계에서나 거절·되돌리기가 가능하다. 화면 단서와 사용자 대본을 분리 저장하고 선택하지 않은 원문을 덮어쓰지 않는다. 적용 전후 조건을 기록한다. 도움 없는 조치를 계속 강요하지 않는다.
+
+F11의 일반 회차 비교와 조건 시험을 구분한다. 조건 시험의 선택 조치는 의도한 차이이며 `interventionDifference`로 표시한다. 나머지 차이는 `confounds`로 남긴다. 구간·분석 버전·발화 자료가 비교 가능할 때만 빈도를 대조한다. 횟수와 분석 가능한 녹음 초를 보존하고 분당 빈도는 `count / analyzedSeconds * 60`으로 계산한다. 자료가 없으면 0이 아닌 미측정이다. STT가 군말을 제거할 수 있으므로 사용자 교정 여부와 품질 상태를 표시한다.
+
+`trialOutcome`은 improved/noClearChange/worse/uncertain으로 기록하며, 시간·내용·부담의 세부값을 보존한다. 사용자 설명과 시험 결과가 맞아도 원인 확정 필드를 만들지 않는다. 부담 응답은 선택 사항이다. 실제 발표에서 사용할 수 없는 단서는 줄이거나 제거한 전체 연습을 별도로 연결한다.
+
 ## 5. 데이터 설계
 
 | 객체 | 주요 필드 | 상태 |
@@ -91,9 +105,12 @@ AI 공급자·모델·배포 환경은 미정이다. 외부 AI를 쓰기 전 전
 | ReviewIssue | id, sourceSessionId, sectionId, type, startSec, endSec, evidence, analysisVersion | 계획·기존 검토 항목 확장 |
 | Suggestion | id, baseScriptVersionId, issueIds, before, after, reason, expectedDuration, status | 계획 |
 | ContentCheck | requirementId, scriptVersionId/sessionId, status, evidenceSpans, uncertaintyReason | 계획 |
-| RehearsalComparison | previousSessionId, currentSessionId, conditionsMatch, differences, issueResults, humanReviewStatus | 계획 |
+| RehearsalComparison | previousSessionId, currentSessionId, conditionsMatch, differences, issueResults, humanReviewStatus, trialId, interventionDifference, confounds | 계획 |
+| CoachingInquiry | id, issueId, observationStatus, correctedEvidence, questionCount, answers, userReportSummary, causeStatus, userConfirmed, skipped | 계획·원인 확정/감정 자동 판정 없음 |
+| PracticeAdjustment | id, inquiryId, type, sourceSectionIds, cueText, beforeSettings, afterSettings, userSelected, revertedAt, realPresentationConstraints | 계획·원문 별도 보존 |
+| ConditionTrial | id, adjustmentId, baselineSessionId, trialSessionId, controlledConditions, confounds, fillerCount, analyzedSeconds, contentResults, durationResults, optionalBurdenResponse, outcome, userReview | 계획·단일 회차의 인과 확정 금지 |
 
-원본 녹음은 사용자 브라우저 보관을 기본으로 한다. 버전 마이그레이션 실패 시 기존 세션을 덮어쓰지 않는다. 보관 기간·크기 한도는 장치 시험 후 정하고, 임의로 오래된 기록을 자동 삭제하지 않는다. 비밀키는 어떤 저장 객체에도 포함하지 않는다.
+원본 녹음은 사용자 브라우저 보관을 기본으로 한다. 버전 마이그레이션 실패 시 기존 세션을 덮어쓰지 않는다. 보관 기간·크기 한도는 장치 시험 후 정하고, 임의로 오래된 기록을 자동 삭제하지 않는다. 비밀키는 어떤 저장 객체에도 포함하지 않는다. CoachingInquiry 답변 원문은 기본 로컬 보관하며 외부 전송·내보내기에 자동 포함하지 않는다. 삭제 요청 시 연결된 답변·요약·시험도 포함할 범위를 보여 주고 삭제 여부를 확인한다.
 
 ## 6. 인터페이스 설계
 
@@ -113,6 +130,8 @@ AI 공급자·모델·배포 환경은 미정이다. 외부 AI를 쓰기 전 전
                                 분석 실패 ─────────→ 측정 가능한 결과만 표시
 결과 → 수정 제안 생성 → 검토 → 새 대본 버전 → 부분 재연습 → 전체 재연습
           실패/취소 ─→ 원문·기존 결과 유지
+결과 → 관찰 확인 → 상황 질문(선택) → 연습 조건 선택 → 적용·재연습 → 변화 확인
+          오탐/건너뛰기 ─→ 기존 연습 계속       거절/되돌리기 ─→ 이전 조건 유지
 ```
 
 | 상황 | 사용자에게 보일 상태 | 복구 |
@@ -125,6 +144,9 @@ AI 공급자·모델·배포 환경은 미정이다. 외부 AI를 쓰기 전 전
 | 분석 중 원문 변경 | 이전 버전의 응답 | 새 버전에 자동 적용하지 않고 재요청 |
 | 필수 내용 변경 의심 | 변경 문장·원문 근거·확인 필요 | 사용자가 수정하거나 제안 거절 |
 | 연습 조건 불일치 | 비교 제한과 바뀐 조건 | 같은 조건으로 전체 재연습 |
+| 원인 미확인·질문 건너뛰기 | 미확인 유지 | 일반 옵션 선택 또는 그대로 연습 |
+| 관찰 오탐·자연스러운 표현 | 교정·제외 | 해당 지적·원인 질문을 강제하지 않음 |
+| 조건 변경 효과 없음·악화 | 변화·부담·제약 표시 | 되돌리기 또는 다음 옵션 선택 |
 
 ## 8. 구현 차이와 의존성
 
@@ -135,7 +157,9 @@ AI 공급자·모델·배포 환경은 미정이다. 외부 AI를 쓰기 전 전
 | 정확한 발화 대응 | 인식 수신 시각 기반 근사 | 전사 교정·구간 대응·실제 음성 검증 |
 | 자동 대본 수정 | API·모델 없음 | F7–F8, 전송 안내, 서버 비용·실패 처리 |
 | 내용 보존 | 의미 비교 없음 | 필수 항목·근거 모델·검증 세트 |
-| 항목별 재점검 | 측정값 비교만 존재 | F9–F10, 비교 키 확장·사용자 확인 |
+| 항목별 재점검 | 측정값 비교만 존재 | R2는 F13–F14·조건 기록·사용자 확인, R3에서 F9–F10 수정안까지 연결 |
+| 상황·원인 질문 | 측정값만 있고 질문 흐름 없음 | F13, 재생 확인·사용자 교정·선택권 |
+| 연습 조건 시험 | 단서 생성·조건 버전·시험 비교 없음 | F14 및 F11 확장, 실제 사용자 과업 검증 |
 | 저장·삭제 실패 | 저장 안내 존재, 삭제 결과를 화면에서 확인하지 않음 | 오류 전달·재시도 UX·실제 저장소 시험 |
 | 운영 검증 | 단위 27개 및 기존 Docker·health·S1–S4 CI 4개 성공 확인 | 실제 장치·미디어 별도 검사·신규 기능·공개 배포 검증 |
 
