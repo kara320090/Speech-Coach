@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { createServer } from "../server.js"
-import { localUrl, validateInput, validateOutput, buildMessages, createLocalCoach } from "../server/local-coach.js"
+import { localUrl, validateInput, validateOutput, buildMessages, createLocalCoach, outputSchema } from "../server/local-coach.js"
 
 const sample = (extra = {}) => ({ task: "review", requestId: "request-1", versionId: "version-1", script: "결과를 5분 동안 저장한다. 효과는 검증하지 않았다.", sources: "결과를 5분 동안 저장한다. 효과는 검증하지 않았다.", question: "얼마나 보관하나요?", answer: "5분 동안 저장해요.", ...extra })
 const reviewed = { state: "supported", supported: "저장 시간을 설명했어요.", answerQuote: "5분 동안 저장해요.", sourceQuote: "결과를 5분 동안 저장한다.", nextStep: "이 설명으로 짧게 발표해 보세요." }
@@ -106,4 +106,18 @@ test("HTTP endpoint rejects cross-origin requests, oversize, invalid JSON and wr
     assert.equal((await fetch(base + "/api/coach", { method: "POST", headers: { "Content-Type": "application/json" }, body: "broken" })).status, 400)
     assert.equal((await post(base, { x: "x".repeat(33000) })).status, 413)
   })
+})
+
+test("review answer quotes are constrained to the actual user answer, never a paraphrase", () => {
+  const input = validateInput(sample({ answer: "이전에 얻은 결과를 잠시 저장하고 같은 요청에 다시 사용하는 공간입니다." }))
+  const schema = outputSchema(input)
+  assert.deepEqual(schema.properties.answerQuote.enum, ["", input.answer])
+  const wrong = { ...reviewed, answerQuote: "이전 결과를 보관했다가 재사용한다" }
+  assert.throws(() => validateOutput(wrong, input))
+})
+
+test("a grounded review with an empty model nextStep still receives the derived next action", () => {
+  const result = validateOutput({ ...reviewed, nextStep: "" }, sample())
+  assert.equal(result.state, "supported"); assert.ok(result.nextStep.length > 0); assert.equal(result.comparison, result.nextStep)
+  assert.throws(() => validateOutput({ ...reviewed, nextStep: "", sourceQuote: "만들어 낸 문장" }, sample()))
 })

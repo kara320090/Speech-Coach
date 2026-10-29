@@ -41,9 +41,9 @@ test("runtime profile validates owned files, ports and resource limits", () => {
   for (const patch of [{ voicePort: 8088 }, { textPort: 0 }, { gpuLayers: -1 }, { contextSize: 2048 }, { threads: 200 }, { llamaPath: "" }]) assert.throws(() => validateRuntimeConfig({ ...configInput, ...patch }, process.cwd()))
 })
 test("model child configuration is loopback-only, offline, shell-free and does not pass provider keys", () => {
-  const specs = buildWorkerSpecs(validateRuntimeConfig(configInput, process.cwd()), process.cwd(), { PATH: "safe-path", AI_GATEWAY_API_KEY: "fake-test-only", HF_TOKEN: "fake-test-only" })
+  const specs = buildWorkerSpecs(validateRuntimeConfig(configInput, process.cwd()), process.cwd(), { PATH: "safe-path", AI_GATEWAY_API_KEY: "fake-test-only", HF_TOKEN: "fake-test-only", GEMINI_API_KEY: "fake-test-only", GOOGLE_API_KEY: "fake-test-only" })
   assert.ok(specs[0].args.includes("--offline")); assert.ok(specs[0].args.includes("127.0.0.1")); assert.ok(specs[0].args.includes("--log-disable"))
-  for (const s of specs) { assert.equal(s.env.HF_HUB_OFFLINE, "1"); assert.equal(s.env.HF_TOKEN, undefined); assert.equal(s.env.AI_GATEWAY_API_KEY, undefined); assert.equal(s.env.PATH, "safe-path") }
+  for (const s of specs) { assert.equal(s.env.HF_HUB_OFFLINE, "1"); assert.equal(s.env.HF_TOKEN, undefined); assert.equal(s.env.AI_GATEWAY_API_KEY, undefined); assert.equal(s.env.GEMINI_API_KEY, undefined); assert.equal(s.env.GOOGLE_API_KEY, undefined); assert.equal(s.env.PATH, "safe-path") }
 })
 test("missing or malformed runtime profile returns a safe setup message", async () => {
   await assert.rejects(readRuntimeConfig(path.join(os.tmpdir(), "speech-coach-no-such-profile.json")), error => error.code === "configuration" && !error.message.includes(os.tmpdir()))

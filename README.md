@@ -1,5 +1,11 @@
 # Speech-Coach — 대본을 이해하고 내 말로 발표하기
 
+## 모델 가중치와 평가 실행
+
+실제 Qwen3-4B·faster-whisper-base 가중치는 [GitHub Release](https://github.com/kara320090/Speech-Coach/releases/tag/model-weights-v1)에 라이선스·분할 순서·해시와 함께 배포한다. 평가용 `docker compose up --build`는 모델을 포함한 이미지에서 Node·텍스트 모델·전사 모델을 함께 시작하며 운영 PC·GPU·외부 AI 키를 요구하지 않는다. 처음 이미지 빌드에는 고정 공개 가중치 다운로드가 필요하다. [복원·CPU Docker 안내](docs/model-distribution.md).
+
+제출 흐름은 시간·구간·전후 비교·TXT 대본·자체 AI 이해/수정·파일 전사를 포함한 **8개**이며 각 ID의 E2E 파일과 연결한다. Gemini 새 대본 생성은 키가 필요한 선택 기능으로 핵심 검사를 대신하지 않는다.
+
 ## 공개 웹과 자체 AI 연결
 
 - 프론트엔드: [공개 웹](https://speech-coach-public.vercel.app/), Vercel의 `Other` 프리셋, 출력 폴더 `public`. `vercel.json`이 `/api/*`와 `/__health`를 Render 백엔드로 전달한다.
@@ -72,7 +78,7 @@ npm start
 
 `node --test --test-concurrency=1`: **163개 통과**. 기존 S1–S4·S9 **5개**, 메인 전사·기존 녹화·파일·대본 코칭 별도 미디어 검사 **35항목 확인**. 생성 서비스와 코칭의 독립성은 가짜 응답·실제 서명된 에이전트 전송으로 검사했다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다. [진행 기록](progress.md).
 
-`docker compose up --build`는 모델 없는 기본 웹을 제공하며, Render는 서명된 운영 PC 에이전트로 코칭·전사를 처리한다. PC의 `npm run start:agent`와 모델이 실행 중이어야 자체 AI를 사용할 수 있다. 새 대본 생성은 서버 환경의 Gemini 키를 별도로 사용하며, 생성 서비스가 준비되지 않아도 기존 대본으로 연습할 수 있다. 검사는 [진행 기록](progress.md)에서 현재 확인 범위를 구분한다.
+`docker compose up --build`는 자체 CPU 모델과 웹을 함께 제공하며, 공개 Render는 서명된 운영 PC 에이전트로 코칭·전사를 처리한다. PC의 `npm run start:agent`와 모델이 실행 중이어야 자체 AI를 사용할 수 있다. 새 대본 생성은 서버 환경의 Gemini 키를 별도로 사용하며, 생성 서비스가 준비되지 않아도 기존 대본으로 연습할 수 있다. 검사는 [진행 기록](progress.md)에서 현재 확인 범위를 구분한다.
 
 ## 기획·정의·분석 문서
 

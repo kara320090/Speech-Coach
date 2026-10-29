@@ -1,5 +1,9 @@
 # 자체 AI 실행
 
+## GitHub 모델 파일·Docker CPU 실행
+
+실제 가중치와 라이선스는 [model-weights-v1](https://github.com/kara320090/Speech-Coach/releases/tag/model-weights-v1), 해시·복원 정보는 `model-release.json`에 있다. `gh release download`와 `restore-models.mjs`로 복원할 수 있다. 평가용 Docker는 동일 모델을 이미지에 포함해 CPU로 직접 실행하며 PC 에이전트가 필요 없다. [배포·복원·평가 실행 안내](../docs/model-distribution.md).
+
 ## 공개 사이트의 AI 실행
 
 공개 프론트는 Vercel, API는 Render, 모델 계산은 운영 PC에서 수행한다. 브라우저는 같은 사이트의 `/api/*`를 호출하고 Vercel이 Render로 전달한다. 운영 PC의 에이전트는 Render에 HTTPS로 연결해 작업을 받고 로컬 모델로 처리한 결과를 반환한다.
@@ -19,9 +23,9 @@ npm run ai:pair
 npm run start:agent
 ```
 
-이 명령은 Qwen·전사 프로세스의 준비를 확인하고 Render에 연결한다. 개인 키·환경 파일·모델은 Git에 넣지 않는다. 각 작업은 시간 제한·취소·크기 제한을 적용하고 메모리에서만 전달하며, 모델 입력·답변·음성을 로그나 서버 DB에 보관하지 않는다. 에이전트 종료 시 모델도 함께 종료한다. 이 PC에서 에이전트를 계속 실행해야 공개 사이트의 AI가 작동한다.
+이 명령은 Qwen·전사 프로세스의 준비를 확인하고 Render에 연결한다. 개인 키·환경 파일은 Git에 넣지 않는다. 실제 공개 모델 가중치는 별도 GitHub Release에 배포한다. 각 작업은 시간 제한·취소·크기 제한을 적용하고 메모리에서만 전달하며, 모델 입력·답변·음성을 로그나 서버 DB에 보관하지 않는다. 에이전트 종료 시 모델도 함께 종료한다. 이 PC에서 에이전트를 계속 실행해야 공개 사이트의 AI가 작동한다.
 
-운영 확인은 공개 사이트의 `/api/model-status`에서 `ready: true`, `runtime.mode: self-hosted-agent`, `runtime.transcriptionReady: true`로 한다. 로컬에서 화면까지 함께 개발할 때만 `npm start`를 사용한다. 기존 Docker 기본 웹은 `node server.js`로 실행하며 별도 모델 에이전트를 자동 설치하지 않는다.
+운영 확인은 공개 사이트의 `/api/model-status`에서 `ready: true`, `runtime.mode: self-hosted-agent`, `runtime.transcriptionReady: true`로 한다. 로컬에서 화면까지 함께 개발할 때만 `npm start`를 사용한다. 평가용 Docker는 모델과 Node를 함께 시작하고, 공개 Render의 Node 서비스는 별도 운영 PC 에이전트를 사용한다.
 
 ## 모델 프로세스 관리
 
@@ -78,7 +82,7 @@ node server.js
 
 ## 4. 배포와 한계
 
-- 기존 Docker·Render 구성은 모델 없이 기본 웹을 검증하는 구성이다. 모델이나 GPU를 자동 설치하지 않는다.
+- Docker는 빌드 때 모델을 준비하고 시작 때 CPU 모델과 웹을 함께 실행한다. Render 공개 서비스는 기존 운영 PC 에이전트 방식이다.
 - 컨테이너의 localhost는 개발자 PC가 아니다. 공개 배포는 Node와 추론 프로세스를 같은 운영 호스트/네트워크 네임스페이스에서 준비해야 한다. 이 공개 배포는 아직 검증하지 않았다.
 - 모델은 풀이·검토 초안을 생성한다. 원문 인용은 입력에 존재하는 문구로 제한하지만 인용의 논리적 타당성·사실성을 보증하지 않는다.
 - 수정에서 수치·단위가 달라지면 적용을 차단한다. 의미 검사는 일부 표현 규칙과 사용자 확인이며 완전한 의미 보존 모델이 아니다.

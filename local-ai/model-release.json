@@ -1,0 +1,134 @@
+{
+  "format": 1,
+  "repository": "kara320090/Speech-Coach",
+  "tag": "model-weights-v1",
+  "releaseUrl": "https://github.com/kara320090/Speech-Coach/releases/tag/model-weights-v1",
+  "description": "Unmodified public Qwen GGUF and converted Whisper weights, self-hosted without fine-tuning.",
+  "models": [
+    {
+      "path": "Qwen3-4B-Q4_K_M.gguf",
+      "size": 2497280256,
+      "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+      "license": "Apache-2.0",
+      "source": "Qwen/Qwen3-4B-GGUF",
+      "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+      "assets": [
+        "Qwen3-4B-Q4_K_M.gguf.part01",
+        "Qwen3-4B-Q4_K_M.gguf.part02",
+        "Qwen3-4B-Q4_K_M.gguf.part03"
+      ]
+    },
+    {
+      "path": "faster-whisper-base/model.bin",
+      "size": 145217532,
+      "sha256": "d01c3014881c9c6f3133c182f3d2887eb6ca1c789a7538c5c007196857a0a6a9",
+      "license": "MIT",
+      "source": "Systran/faster-whisper-base",
+      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      "assets": [
+        "faster-whisper-base-model.bin"
+      ]
+    },
+    {
+      "path": "faster-whisper-base/config.json",
+      "size": 2309,
+      "sha256": "56a6d8110d311f19c8f0471e562832c7527f146b567275bfca59fcf7c184da9a",
+      "license": "MIT",
+      "source": "Systran/faster-whisper-base",
+      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      "assets": [
+        "faster-whisper-base-config.json"
+      ]
+    },
+    {
+      "path": "faster-whisper-base/tokenizer.json",
+      "size": 2203239,
+      "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+      "license": "MIT",
+      "source": "Systran/faster-whisper-base",
+      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      "assets": [
+        "faster-whisper-base-tokenizer.json"
+      ]
+    },
+    {
+      "path": "faster-whisper-base/vocabulary.txt",
+      "size": 459861,
+      "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+      "license": "MIT",
+      "source": "Systran/faster-whisper-base",
+      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      "assets": [
+        "faster-whisper-base-vocabulary.txt"
+      ]
+    },
+    {
+      "path": "faster-whisper-base/README.md",
+      "size": 1991,
+      "sha256": "b922acef3616e27b1d416260b63ba7114c732f0315012006781af2da69cd1ebf",
+      "license": "MIT",
+      "source": "Systran/faster-whisper-base",
+      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      "assets": [
+        "faster-whisper-base-README.md"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "name": "Qwen3-4B-Q4_K_M.gguf.part01",
+      "size": 1073741824,
+      "sha256": "b2bef48525252f79b303b7f15f26ddfce90f15b7c8272bd7c1e5cbf3c63946ba"
+    },
+    {
+      "name": "Qwen3-4B-Q4_K_M.gguf.part02",
+      "size": 1073741824,
+      "sha256": "b62067fdef520baf575e199470d3e48015ea92a166f5f0114e3635c24c44bf48"
+    },
+    {
+      "name": "Qwen3-4B-Q4_K_M.gguf.part03",
+      "size": 349796608,
+      "sha256": "db210a3f62c5a85c4e78f9f20e44e5bbf8112da98d0da5720ee8d3ae9f3c36ae"
+    },
+    {
+      "name": "faster-whisper-base-model.bin",
+      "size": 145217532,
+      "sha256": "d01c3014881c9c6f3133c182f3d2887eb6ca1c789a7538c5c007196857a0a6a9"
+    },
+    {
+      "name": "faster-whisper-base-config.json",
+      "size": 2309,
+      "sha256": "56a6d8110d311f19c8f0471e562832c7527f146b567275bfca59fcf7c184da9a"
+    },
+    {
+      "name": "faster-whisper-base-tokenizer.json",
+      "size": 2203239,
+      "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+    },
+    {
+      "name": "faster-whisper-base-vocabulary.txt",
+      "size": 459861,
+      "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+    },
+    {
+      "name": "faster-whisper-base-README.md",
+      "size": 1991,
+      "sha256": "b922acef3616e27b1d416260b63ba7114c732f0315012006781af2da69cd1ebf"
+    },
+    {
+      "name": "Qwen3-Apache-2.0.txt",
+      "size": 11343,
+      "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e"
+    },
+    {
+      "name": "Whisper-MIT.txt",
+      "size": 1063,
+      "sha256": "b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d"
+    },
+    {
+      "name": "MODEL-NOTICE.txt",
+      "size": 779,
+      "sha256": "bb0e4b930b393f07ee733c751d028c2d35e0f9b932d0998f8070ca9ce8ab61f3"
+    }
+  ]
+}

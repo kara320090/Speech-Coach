@@ -50,7 +50,7 @@ export function assertPortFree(port) {
 export function buildWorkerSpecs(config, root, env = process.env) {
   const offline = { HF_HUB_OFFLINE: "1", HF_HUB_DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1" }
   const localEnv = { ...env }
-  for (const key of ["AI_GATEWAY_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"]) delete localEnv[key]
+  for (const key of ["AI_GATEWAY_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"]) delete localEnv[key]
   return [
     { name: "text", port: config.textPort, command: config.llamaPath,
       args: ["-m", config.modelPath, "--host", "127.0.0.1", "--port", String(config.textPort), "--alias", "speech-coach", "-c", String(config.contextSize), "-t", String(config.threads), "-ngl", String(config.gpuLayers), "--parallel", "1", "--reasoning", "off", "--offline", "--log-disable"],

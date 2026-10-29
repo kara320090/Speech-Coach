@@ -1,6 +1,6 @@
 // Local inference only. Document text is data; the model has no tools or network access.
 import { checkRevision, protectedNumbers } from "../public/js/content-check.js"
-export const PROMPT_VERSION = "understanding-v4"
+export const PROMPT_VERSION = "understanding-v5"
 export const LIMITS = Object.freeze({ script: 2400, sources: 2400, answer: 1000, question: 400, body: 32_768, output: 64_000 })
 
 export function localUrl(value) {
@@ -75,6 +75,8 @@ export function outputSchema(input) {
     schema.properties.concepts.items.properties.sourceQuote = { type: "string", enum: sourceEnum }
   } else if (input.task === "question") schema.properties.referenceQuote = { type: "string", enum: sourceEnum }
   else schema.properties.sourceQuote = { type: "string", enum: input.task === "review" ? ["", ...sourceEnum] : sourceEnum }
+  // Preserve the user's actual words in review evidence, including punctuation.
+  if (input.task === "review") schema.properties.answerQuote = { type: "string", enum: ["", ...spans(input.answer)] }
   return schema
 }
 
@@ -101,14 +103,15 @@ export function validateOutput(raw, input) {
     if (!validString(raw.question, 400) || !raw.question.trim() || !sourceValid(raw.referenceQuote)) invalid()
     result = { ...raw, grounded: Boolean(input.sources) }
   } else {
-    if (!["supported", "needs-work", "uncertain"].includes(raw.state) || !validString(raw.supported, 800) || !validString(raw.nextStep, 1000) || !raw.nextStep.trim() || !validString(raw.answerQuote, 1000) || !(raw.sourceQuote === "" || sourceValid(raw.sourceQuote))) invalid()
+    // The displayed next action is derived below from validated evidence/state, not the model's wording.
+    if (!["supported", "needs-work", "uncertain"].includes(raw.state) || !validString(raw.supported, 800) || !validString(raw.nextStep, 1000) || !validString(raw.answerQuote, 1000) || !(raw.sourceQuote === "" || sourceValid(raw.sourceQuote))) invalid()
     if (raw.answerQuote && !exactQuote(raw.answerQuote, input.answer)) invalid()
     if (raw.supported && !raw.answerQuote) invalid()
     const hasEvidence = Boolean(input.sources && raw.sourceQuote)
     if (hasEvidence && raw.state === "supported" && (!raw.supported || !raw.answerQuote)) invalid()
     const state = hasEvidence ? raw.state : "uncertain"
-    result = { ...raw, state, supported: hasEvidence ? raw.supported : "", comparison: raw.nextStep,
-      nextStep: state === "supported" ? "자료와 맞춰 본 설명을 말로 한 번 이어가 보세요." : state === "needs-work" ? `자료의 “${raw.sourceQuote}” 부분을 함께 연결해 볼게요. 이 내용을 자신의 말로 다시 설명해 보세요.` : "이 질문을 확인할 근거가 충분하지 않아요. 관련 자료를 더하거나 지금 확인할 수 있는 범위부터 설명해 볼 수 있어요.", humanReview: "unreviewed" }
+    const nextStep = state === "supported" ? "자료와 맞춰 본 설명을 말로 한 번 이어가 보세요." : state === "needs-work" ? `자료의 “${raw.sourceQuote}” 부분을 함께 연결해 볼게요. 이 내용을 자신의 말로 다시 설명해 보세요.` : "이 질문을 확인할 근거가 충분하지 않아요. 관련 자료를 더하거나 지금 확인할 수 있는 범위부터 설명해 볼 수 있어요."
+    result = { ...raw, state, supported: hasEvidence ? raw.supported : "", comparison: raw.nextStep.trim() || nextStep, nextStep, humanReview: "unreviewed" }
   }
   return { ...result, evidenceStatus: input.sources ? "provided-material-only" : "no-source-material" }
 }

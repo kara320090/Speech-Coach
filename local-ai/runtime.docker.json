@@ -1,0 +1,12 @@
+{
+  "llamaPath": "/opt/llama/llama-server",
+  "modelPath": "/opt/speech-coach/models/Qwen3-4B-Q4_K_M.gguf",
+  "pythonPath": "/opt/speech-coach/venv/bin/python",
+  "sttModelDir": "/opt/speech-coach/models/faster-whisper-base",
+  "textPort": 8088,
+  "voicePort": 8081,
+  "contextSize": 12288,
+  "threads": 4,
+  "gpuLayers": 0,
+  "startupTimeoutMs": 90000
+}

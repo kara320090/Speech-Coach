@@ -1,5 +1,4 @@
-# Host scenarios run without any model. AI needs separately provisioned local processes.
-# Loopback inside a container is the container itself, not the developer's computer.
+# CPU models and the backend run together inside app. No GPU, PC agent or provider key required.
 services:
   app:
     build:
@@ -13,5 +12,7 @@ services:
       TRANSCRIBE_TOTAL_SECONDS: ${TRANSCRIBE_TOTAL_SECONDS:-3600}
       # 코칭·전사는 자체 AI. Gemini 키는 새 대본 생성 버튼을 누른 경우에만 사용한다.
       AI_PROVIDER: local
+      AI_EXECUTION_MODE: managed
+      AI_RUNTIME_CONFIG: /app/local-ai/runtime.docker.json
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
