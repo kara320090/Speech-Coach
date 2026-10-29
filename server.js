@@ -6,6 +6,7 @@ import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createScriptImportHandler } from "./server/script-import.js"
 import { createScriptAlignHandler } from "./server/script-align.js"
+import { createSegmentCoach, SEGMENT_LIMITS } from "./server/segment-coach.js"
 
 import { CoachError, LIMITS } from "./server/local-coach.js"
 import { createCoach, createScriptGenerator } from "./server/coach-provider.js"
@@ -64,6 +65,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
   const inferenceEnv = broker ? { ...env, AI_PROVIDER: "local", LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
   const inferenceFetch = broker ? broker.fetch : fetchImpl
   const coach = createCoach({ env: inferenceEnv, fetchImpl: inferenceFetch })
+  const segmentCoach = createSegmentCoach({ coach })
   const generator = createScriptGenerator({ env, fetchImpl })
   const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const frontendOrigins = new Set(["https://speech-coach-public.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
@@ -93,11 +95,11 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         return
       }
       if (!(req.headers["content-type"] || "").startsWith("application/json")) return sendJson(res, 415, { error: "content-type", message: "JSON 형식으로 보내 주세요." })
-      const body = await readBody(req, LIMITS.body)
+      const body = await readBody(req, pathname === "/api/coach/segment" ? SEGMENT_LIMITS.body : LIMITS.body)
       if (!body) return sendJson(res, 413, { error: "too-large", message: "입력이 너무 커요. 짧은 구간으로 나누어 주세요." })
       let data
       try { data = JSON.parse(body.toString("utf8")) } catch { return sendJson(res, 400, { error: "invalid-json", message: "요청을 읽지 못했어요." }) }
-      const service = pathname === "/api/scripts/generate" ? generator : coach
+      const service = pathname === "/api/scripts/generate" ? generator : pathname === "/api/coach/segment" ? segmentCoach : coach
       const result = await service.run(data, controller.signal, { client: clientId(req) })
       if (!res.destroyed) sendJson(res, 200, result)
     } catch (e) {
@@ -113,7 +115,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         if (!broker) return sendJson(res, 404, { error: "not-found" })
         return await broker.handle(req, res, url.pathname)
       }
-      if (["/api/transcribe", "/api/coach", "/api/model-status", "/api/scripts/generate", "/api/scripts/generation-status"].includes(url.pathname)) return await api(req, res, url.pathname)
+      if (["/api/transcribe", "/api/coach", "/api/coach/segment", "/api/model-status", "/api/scripts/generate", "/api/scripts/generation-status"].includes(url.pathname)) return await api(req, res, url.pathname)
       if (url.pathname === "/api/scripts/align") {
         if (req.method !== "POST") {
           res.writeHead(405, { Allow: "POST", ...HEADERS })
