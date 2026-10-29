@@ -10,7 +10,7 @@ export function measurementCards(session, { h, seek, onUpdated }) {
   const f = session.analysis.transcript?.fillers
   const fillers = h("section", { class: "card", "aria-label": "군말 후보 측정" },
     h("h2", null, "군말 후보 측정"),
-    h("p", { "data-testid": "filler-total" }, f?.status === "ok" ? `인식된 글에서 ${f.count}회 · ${f.types.length}종류` : "측정 못 함 — 분석할 전사문이 없거나 이전 방식으로 저장된 기록이에요."),
+    h("p", { "data-testid": "filler-total" }, f?.status === "ok" ? `인식된 글에서 ${f.count}회 · ${f.types.length}종류` : `측정 못 함 — ${f?.reason || "분석할 전사문이 없거나 이전 방식으로 저장된 기록이에요."}`),
     f?.status === "ok" ? h("ul", null, f.types.map((x) => h("li", null, `“${x.word}” ${x.count}회`))) : null,
     h("p", { class: "hint" }, `기준: 독립 토큰 ${FILLER_WORDS.join("·")} 일치. 늘인 ‘음/어’는 한 토큰을 1회로 세어요. 필요한 표현도 포함될 수 있으며, 인식에서 빠진 군말은 셀 수 없어요. 0회는 전사문에서 후보가 없다는 뜻이에요.`))
   const b = session.analysis.blink, r = b?.rules || BLINK_RULES

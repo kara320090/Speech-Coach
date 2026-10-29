@@ -11,7 +11,7 @@ async function startPractice(page: Page, { seconds = "30", video = false, speech
   await setTarget(page, "0", seconds)
   await page.getByText("연습 설정").click()
   await page.getByLabel("웹캠 영상도 기록").setChecked(video)
-  if (speech) await page.getByLabel("음성 인식으로 말하기 속도").check()
+  if (speech) await page.getByLabel("분석할 때 자체 AI로 음성 전사·군말·말하기 속도 분석").check()
   await extra()
   await page.getByRole("button", { name: "녹화 시작" }).click()
   await expect(page.getByRole("button", { name: "녹화 종료" })).toBeEnabled()
@@ -99,8 +99,8 @@ test.describe("외부 음성 인식 비활성화", () => {
     })
     await openMain(page)
     await page.getByText("연습 설정").click()
-    await expect(page.getByLabel("음성 인식으로 말하기 속도")).toBeDisabled()
-    await expect(page.getByText("외부 음성 인식은 사용하지 않아요.", { exact: false })).toBeVisible()
+    await expect(page.getByLabel("분석할 때 자체 AI로 음성 전사·군말·말하기 속도 분석")).toBeEnabled()
+    await expect(page.getByText("Gemini와 브라우저 제공 업체의 음성 인식은 사용하지 않아요.", { exact: false })).toBeVisible()
     await setTarget(page, "0", "20")
     await page.getByRole("button", { name: "녹화 시작" }).click()
     await stopAndAnalyze(page)
@@ -110,19 +110,19 @@ test.describe("외부 음성 인식 비활성화", () => {
 })
 
 test.describe("실패 상황", () => {
-  test("음성 인식이 없는 브라우저: 자체 파일 전사 안내와 미측정 상태를 표시한다", async ({ page }) => {
+  test("브라우저 음성 인식이 없어도 자체 전사를 선택하고 서버 미준비 상태를 표시한다", async ({ page }) => {
     await page.addInitScript(() => {
       delete (window as any).SpeechRecognition
       delete (window as any).webkitSpeechRecognition
     })
     await openMain(page)
-    await expect(page.getByText("음성 인식 지원 안 됨")).toBeVisible()
+    await expect(page.getByText("종료 후 자체 AI 전사 켜짐")).toBeVisible()
     await page.getByText("연습 설정").click()
-    await expect(page.getByLabel("음성 인식으로 말하기 속도")).toBeDisabled()
-    await expect(page.getByText("외부 음성 인식은 사용하지 않아요.", { exact: false })).toBeVisible()
+    await expect(page.getByLabel("분석할 때 자체 AI로 음성 전사·군말·말하기 속도 분석")).toBeEnabled()
+    await expect(page.getByText("Gemini와 브라우저 제공 업체의 음성 인식은 사용하지 않아요.", { exact: false })).toBeVisible()
     await setTarget(page, "0", "20")
     await page.getByRole("button", { name: "녹화 시작" }).click()
-    await expect(page.getByTestId("speed")).toContainText("측정 안 함")
+    await expect(page.getByTestId("speed")).toContainText("자체 AI 전사로 계산")
     await stopAndAnalyze(page)
     await expect(page.getByTestId("avg-speed")).toContainText("측정 못 함")
   })

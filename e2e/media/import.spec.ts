@@ -44,7 +44,7 @@ test.describe("영상·소리 파일 불러오기", () => {
     await item.getByRole("button").click()
     await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThanOrEqual(start - 0.3)
     // 글자 변환을 켜지 않았으니 속도·반복은 분석하지 않았다고 알린다
-    await expect(result).toContainText("음성 인식을 켜지 않아서")
+    await expect(result).toContainText("자체 AI 전사를 꺼서")
     await expect(page.getByText("영상 파일은 서버로 보내지 않았어요")).toBeVisible()
   })
 

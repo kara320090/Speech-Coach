@@ -74,3 +74,7 @@ F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measur
 | F22 | FR-22 / AC-22 | UI-CREATE NC4 | script-generation.js·create-script-page.js·gemini-coach.test.mjs·coach-provider.spec.ts | 새 대본 생성·확인·원본 보존·자체 코칭 이동 |
 
 F17–F20·F16은 자체 모델로 처리하며, F22만 외부 Gemini를 사용한다. 주최 측 S1–S4·S9와 scenarios.yaml의 흐름은 유지한다.
+
+## 메인 전사 연결 검증
+
+F16·FR-16·AC-16은 메인 분석과 파일 가져오기에서 동일한 자체 전사 API를 사용한다. `recording-analysis.js`·`tests/recording-analysis.test.mjs`가 짧은 녹음·선택 해제·서버 없음·부분 실패·취소를 검증한다. `e2e/media/main-transcription.spec.ts`는 메인 버튼→WAV 요청→군말·속도·재생 위치·재조회와 원본 보존을 검증한다. 주최 측 S1–S4·S9와 버튼 이름은 유지한다.

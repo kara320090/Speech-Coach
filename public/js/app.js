@@ -3,7 +3,7 @@
 import { formatClock, formatSigned } from "./time.js"
 import { parsePlan, planSignature, planTotal, paceAt, sectionResults } from "./plan.js"
 import {
-  analyzeFillers, analyzeGaze, analyzeSilence, analyzeTranscript, buildReviewItems, classifyResult, compareSessions, conditionKey, liveRate, windowMetrics,
+  analyzeGaze, analyzeSilence, buildReviewItems, classifyResult, compareSessions, conditionKey, liveRate, windowMetrics,
   GAZE_MIN_SEC, LIVE_SPEED_WINDOW_SEC, SILENCE_MIN_SEC, SPEED_DEVIATION, SPEED_WINDOW_SEC,
 } from "./analysis.js"
 import { CONDITIONS, QUESTION_LIMIT, REASONS, expectedSentence, keywordsOf, practiceRange, splitSentences, suggestFor } from "./coach.js"
@@ -13,6 +13,7 @@ import { deleteSession, getSession, listSessions, saveSession } from "./storage.
 import { measurementCards } from "./measurement-ui.js"
 import { sessionScript } from "./script.js"
 import { createScriptImport } from "./script-ui.js"
+import { analyzeRecordedSpeech } from "./recording-analysis.js"
 
 const app = document.getElementById("app")
 const SETTINGS_KEY = "dasibom.settings"
@@ -24,7 +25,7 @@ const SAMPLE_SCRIPT = `안녕하세요. 오늘은 발표 연습을 돕는 웹 �
 구간을 누르면 그때의 영상을 보고, 무슨 일이 있었는지 짧게 답할 수 있습니다.
 답에 맞춰 핵심어 카드나 진행 막대 같은 연습 방법을 제안하고, 다시 연습한 결과를 전후로 비교합니다.
 모든 영상은 이 기기 안에서만 처리됩니다. 감사합니다.`
-const DEFAULT_RAW = { tmin: "3", tsec: "0", tol: "0", warn: "30", smin: "", smax: "", plan: "", video: true, speech: false, script: SAMPLE_SCRIPT, keywords: false, progress: false }
+const DEFAULT_RAW = { tmin: "3", tsec: "0", tol: "0", warn: "30", smin: "", smax: "", plan: "", video: true, speech: false, transcribe: true, script: SAMPLE_SCRIPT, keywords: false, progress: false }
 const STEPS = [
   { title: "목표 시간·대본 입력", desc: "발표 시간을 정하고 대본을 붙여 넣어요. 구간별 시간 계획도 적을 수 있어요." },
   { title: "녹화", desc: "웹캠·마이크로 연습하면 남은 시간과 말하기 속도를 알려줘요. 카메라가 없으면 시간만 재요." },
@@ -95,9 +96,11 @@ const state = {
   obStep: 0,
   media: { capture: null, status: { audio: "off", video: "off" }, notices: [], cam: "idle", promise: null },
   gaze: new GazeTracker(),
-  phase: "idle", // idle | starting | countdown | recording | saving | recorded | analyzed
+  phase: "idle", // idle | starting | countdown | recording | saving | recorded | analyzing | analyzed
   practice: null,
   pending: null,
+  analysisController: null,
+  analysisProgress: "",
   session: null,
   player: null,
   ctx: null, // 구간 다시 연습: { baseId, item, reason, conds, range, targetSec }
@@ -126,7 +129,7 @@ function scriptEdited() {
   if (state.raw.scriptFile) state.raw.scriptFile = state.raw.script.trim() ? { ...state.raw.scriptFile, edited: true } : null
   scriptImport.refresh()
 }
-const busy = () => ["starting", "countdown", "recording", "saving"].includes(state.phase)
+const busy = () => ["starting", "countdown", "recording", "saving", "analyzing"].includes(state.phase)
 
 /* ───────── 화면 뼈대 ───────── */
 
@@ -237,8 +240,7 @@ function gazeLabel() {
   return { idle: "시선 추적 준비 중", loading: "시선 추적 준비 중", ready: "시선 추적 켜짐", off: "시선 추적 사용 불가" }[state.gaze.status]
 }
 function speechLabel() {
-  if (!SpeechCapture.supported) return "음성 인식 지원 안 됨"
-  return state.raw.speech ? "음성 인식 켜짐" : "음성 인식 꺼짐"
+  return state.raw.transcribe !== false ? "종료 후 자체 AI 전사 켜짐" : "자체 AI 전사 꺼짐"
 }
 
 function renderHeader() {
@@ -285,6 +287,7 @@ function renderHeader() {
       rec && p.settings.sections.length ? h("button", { type: "button", class: "btn btn-secondary", id: "btn-next", disabled: p.marks.length >= p.settings.sections.length, onclick: nextSection }, "다음 구간") : null,
       h("button", { type: "button", class: "btn btn-secondary", id: "btn-stop", disabled: !rec, onclick: stopRecording }, "녹화 종료"),
       h("button", { type: "button", class: "btn btn-secondary", id: "btn-analyze", disabled: state.phase !== "recorded", onclick: analyze }, "분석"),
+      state.phase === "analyzing" ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => state.analysisController?.abort() }, "전사 취소하고 기본 결과 보기") : null,
     ),
     target,
     h(
@@ -336,7 +339,7 @@ function renderStage() {
       : null,
     s && !hasVideoSession && state.player ? state.player : null,
     h("p", { class: "hint", role: "status", id: "seek-status" }, state.seekText || ""),
-    h("span", { class: "hint" }, "영상과 분석은 이 브라우저 안에서만 처리돼요"),
+    h("span", { class: "hint" }, "영상과 결과는 이 브라우저에 저장해요. 자체 AI 전사를 켜면 분석할 때 소리 조각만 자체 서버로 보내요."),
   )
   put(stageCol, h("div", { class: "stage" }, kids), foot, state.hud ? state.hud.details : null)
 }
@@ -407,14 +410,12 @@ function renderScript() {
     { class: "settings", open: state.settingsOpen, ontoggle: (e) => (state.settingsOpen = e.target.open) },
     h("summary", null, "연습 설정"),
     h("div", { class: "row" }, field("tol", "허용 오차(초)"), field("warn", "임박 알림(남은 초)"), field("smin", "최소(분당 음절)"), field("smax", "최대(분당 음절)")),
-    h("p", { class: "hint" }, "남은 시간이 '임박 알림' 이하가 되면 '시간 임박', 목표를 넘으면 '목표 시간 초과'로 알려요. 속도는 '한글 음절 수 ÷ 시간(분)'이고 음성 인식을 켜야 측정돼요."),
+    h("p", { class: "hint" }, "남은 시간이 '임박 알림' 이하가 되면 '시간 임박', 목표를 넘으면 '목표 시간 초과'로 알려요. 말하기 속도는 녹화 종료 후 자체 AI 전사문으로 계산해요."),
     h("label", { class: "hint", for: "f-plan" }, "한 줄에 한 구간씩 '구간 이름 + 시간'을 적어요. 녹화 중 '다음 구간'을 누른 시점으로 계획과 비교해요."),
     plan,
     check("video", "웹캠 영상도 기록 (선택, 소리 기록 포함)", "끄면 카메라 미리보기와 시선 추적은 그대로 두고 소리만 기록해요."),
-    SpeechCapture.supported
-      ? check("speech", "음성 인식으로 말하기 속도·반복 표현 분석 (선택)", "브라우저에 따라 음성이 브라우저 제공 업체의 음성 인식 서비스로 전송될 수 있어요. 켜지 않으면 전송하지 않아요.")
-      : check("speech", "음성 인식으로 말하기 속도·반복 표현 분석 (선택)", "외부 음성 인식은 사용하지 않아요. 녹음한 파일은 영상 불러오기에서 자체 모델로 전사할 수 있어요.", true),
-    h("p", { class: "info" }, "녹화·분석 결과는 이 브라우저 안에만 저장하고 우리 서버로 보내지 않아요."),
+    check("transcribe", "분석할 때 자체 AI로 음성 전사·군말·말하기 속도 분석", "분석 버튼을 누를 때 녹음 소리 조각만 직접 운영하는 서버로 보내요. Gemini와 브라우저 제공 업체의 음성 인식은 사용하지 않아요. 끄면 시간·침묵·시선만 분석해요."),
+    h("p", { class: "info" }, "녹화 영상과 분석 결과는 이 브라우저에 저장해요. 영상·얼굴 데이터는 서버로 보내지 않아요."),
   )
   let body
   if (state.editing) {
@@ -484,8 +485,8 @@ function readSettings(raw) {
     settings: {
       targetSec, toleranceSec: tol, warnSec: warn, speedMin: smin, speedMax: smax,
       sections, planSignature: planSignature(sections),
-      recordAudio: true, recordVideo: Boolean(raw.video), speechRequested,
-      raw: { tmin: raw.tmin, tsec: raw.tsec, tol: raw.tol, warn: raw.warn, smin: raw.smin, smax: raw.smax, plan: raw.plan, audio: true, video: Boolean(raw.video), speech: speechRequested },
+      recordAudio: true, recordVideo: Boolean(raw.video), speechRequested, transcribe: raw.transcribe !== false,
+      raw: { tmin: raw.tmin, tsec: raw.tsec, tol: raw.tol, warn: raw.warn, smin: raw.smin, smax: raw.smax, plan: raw.plan, audio: true, video: Boolean(raw.video), speech: speechRequested, transcribe: raw.transcribe !== false },
     },
   }
 }
@@ -634,7 +635,7 @@ function tick() {
 
   let speedText
   let speedKind = ""
-  if (!s.speechRequested) speedText = SpeechCapture.supported ? "측정 안 함 (음성 인식을 켜지 않았어요)" : "측정 안 함 (이 브라우저는 음성 인식을 지원하지 않아요)"
+  if (!s.speechRequested) speedText = s.transcribe ? "녹화 종료 후 분석하면 자체 AI 전사로 계산해요" : "측정 안 함 (자체 AI 전사를 껐어요)"
   else if (p.speech.status === "unsupported") speedText = "측정 불가 (이 브라우저는 음성 인식을 지원하지 않아요)"
   else if (p.speech.status === "denied") speedText = "측정 불가 (음성 인식 권한이 거부됐어요)"
   else if (p.speech.status === "error") speedText = `측정 불가 (음성 인식 오류${p.speech.detail ? `: ${p.speech.detail}` : ""})`
@@ -738,10 +739,10 @@ async function analyze() {
   const silence = audioOk ? analyzeSilence(rec.samples, rec.sampleRate) : null
   if (silence?.status === "no-signal") notices.push("녹음에 소리가 거의 없어서 긴 침묵을 찾지 않았어요. 마이크 연결과 입력 장치를 확인해 주세요.")
   if (silence?.status === "too-short") notices.push("녹음이 너무 짧아서 긴 침묵을 찾지 않았어요.")
-  const transcript = p.speech ? analyzeTranscript(segments, total) : null
-  let speechState = "off"
-  if (p.speech) speechState = p.speech.status === "on" ? (transcript.status === "ok" ? "ok" : "no-text") : p.speech.status
-  const fillers = speechState === "ok" ? analyzeFillers(segments) : null
+  const wantsSpeech = s.transcribe !== false && audioOk
+  const transcript = null
+  const speechState = wantsSpeech ? "pending" : s.transcribe === false ? "off" : "no-audio"
+  const fillers = null
   const gaze = analyzeGaze(p.gazeSamples, total)
   if (state.media.cam === "ready" && gaze.status !== "ok") notices.push("시선 추적을 쓸 수 없어서 시선 이탈은 분석하지 않았어요.")
   const sectionRows = s.sections.length ? sectionResults(s.sections, p.marks, total) : []
@@ -757,7 +758,7 @@ async function analyze() {
     result,
     marks: p.marks,
     sectionRows,
-    media: { audio: audioOk ? "ok" : p.mediaStatus.audio === "ok" ? "failed" : p.mediaStatus.audio, video: rec.videoBlob ? "ok" : s.recordVideo ? "failed" : "off", speech: speechState, speechDetail: p.speech?.detail || "" },
+    media: { audio: audioOk ? "ok" : p.mediaStatus.audio === "ok" ? "failed" : p.mediaStatus.audio, video: rec.videoBlob ? "ok" : s.recordVideo ? "failed" : "off", speech: speechState, speechDetail: wantsSpeech ? "자체 AI 전사를 완료하지 못했어요. 녹음과 기본 결과는 보존돼요." : "" },
     analysis: {
       silence: silence && { status: silence.status, threshold: silence.threshold, voicedRatio: silence.voicedRatio },
       transcript, fillers: fillers && { count: fillers.count, times: fillers.times },
@@ -773,8 +774,28 @@ async function analyze() {
     videoBlob: rec.videoBlob,
     notices,
   }
+  // Save the original recording and local measurements before any network request.
+  state.phase = "analyzing"
+  state.analysisController = new AbortController()
+  state.analysisProgress = wantsSpeech ? "녹음을 저장한 뒤 자체 AI 음성 전사를 준비해요." : "녹음과 기본 분석 결과를 저장해요."
+  render()
   const saved = await saveSession(session)
   if (!saved.ok) session.notices.push(`기록을 이 기기에 저장하지 못했어요 (${saved.error}). 이 화면을 닫으면 다시 볼 수 없어요.`)
+  const speech = await analyzeRecordedSpeech({ samples: audioOk ? rec.samples : null, sampleRate: rec.sampleRate, durationSec: total, enabled: s.transcribe !== false, signal: state.analysisController.signal,
+    onProgress: (done, count) => { state.analysisProgress = `자체 AI 음성 전사 ${done}/${count}개 조각 처리 중…`; renderResults() } })
+  session.media.speech = speech.status
+  session.media.speechDetail = speech.detail
+  session.transcript = speech.segments
+  session.analysis.transcript = speech.transcript
+  session.analysis.fillers = speech.fillers && { count: speech.fillers.count, times: speech.fillers.times }
+  session.analysis.transcription = { status: speech.status, processing: "self-hosted", detail: speech.detail }
+  session.analysis.items = buildReviewItems({ silence, transcript: speech.transcript, sectionRows, toleranceSec: s.toleranceSec, fillers: speech.fillers, gaze })
+  session.notices.push(speech.detail)
+  const updated = await saveSession(session)
+  if (!updated.ok && saved.ok) session.notices.push("전사 결과를 저장하지 못했어요. 현재 화면에서 확인하고 녹음은 연습 기록에서 다시 볼 수 있어요.")
+  state.analysisController = null
+  state.analysisProgress = ""
+
   state.pending = null
   history.replaceState(null, "", `#/result/${session.id}`)
   showSession(session)
@@ -842,7 +863,8 @@ function makeSeekable(el) {
 /* ───────── 결과 ───────── */
 
 const SPEECH_REASON = {
-  off: "음성 인식을 켜지 않아서 속도와 반복 표현은 분석하지 않았어요.",
+  pending: "자체 AI 전사를 완료하지 못했어요. 저장된 녹음과 기본 결과를 확인할 수 있어요.",
+  off: "자체 AI 전사를 꺼서 속도와 군말은 분석하지 않았어요.",
   unsupported: "이 브라우저가 음성 인식을 지원하지 않아서 속도와 반복 표현은 분석하지 못했어요.",
   denied: "음성 인식 권한이 거부돼서 속도와 반복 표현은 분석하지 못했어요.",
   error: "음성 인식에 오류가 있어서 속도와 반복 표현은 분석하지 못했어요.",
@@ -854,7 +876,8 @@ function renderResults() {
   if (!session) {
     const pend = state.pending
     const text =
-      state.phase === "recording" ? "녹화 중이에요. 마치면 '녹화 종료'를 누르세요."
+      state.phase === "analyzing" ? state.analysisProgress
+      : state.phase === "recording" ? "녹화 중이에요. 마치면 '녹화 종료'를 누르세요."
       : state.phase === "recorded" ? `녹화가 저장됐어요 (${formatClock(pend.total)}). '분석'을 누르면 다시 볼 구간이 여기에 표시돼요.`
       : state.ctx ? "연습 구간만 다시 녹화해 보세요. 분석하면 이전 녹화와 나란히 비교해요."
       : "'녹화 시작'을 누르고 대본을 읽어 보세요. 녹화를 마친 뒤 '분석'을 누르면 다시 볼 구간이 여기에 표시돼요."
@@ -865,7 +888,7 @@ function renderResults() {
   const r = session.result
   const hasMedia = Boolean(session.audioBlob || session.videoBlob)
   const speechOk = session.media.speech === "ok"
-  const sp = a.transcript?.status === "ok" ? `${Math.round(a.transcript.overallRate)} 음절/분 (한글 음절 ${a.transcript.totalSyllables}개 ÷ 전체 ${formatClock(session.totalSec)}, 쉼 포함)` : `측정 못 함 — ${SPEECH_REASON[session.media.speech] || ""}`
+  const sp = a.transcript?.status === "ok" ? `${Math.round(a.transcript.overallRate)} 음절/분 (한글 음절 ${a.transcript.totalSyllables}개 ÷ 전체 ${formatClock(session.totalSec)}, 쉼 포함)` : `측정 못 함 — ${session.media.speechDetail || SPEECH_REASON[session.media.speech] || ""}`
   const stat = (label, value, attrs = {}) => h("div", { class: "stat" }, h("dt", null, label), h("dd", attrs, value))
   const summary = h(
     "section",
@@ -915,8 +938,8 @@ function renderResults() {
   const notes = []
   if (!hasMedia) notes.push("소리를 기록하지 못해서 긴 침묵은 찾지 못했고, 다시 듣기도 할 수 없어요.")
   else if (a.silence?.status === "ok") notes.push(`긴 침묵 기준: 소리가 기준 이하인 상태가 ${SILENCE_MIN_SEC}초 이상. 이 녹음의 소리 크기를 기준으로 삼았어요.`)
-  if (!speechOk) notes.push(SPEECH_REASON[session.media.speech] || "")
-  else notes.push(`속도 변화 기준: ${SPEED_WINDOW_SEC}초 구간 속도가 평균보다 ${Math.round(SPEED_DEVIATION * 100)}% 이상 차이. 글 시간은 인식 결과가 도착한 시점으로 추정한 값이라 정확하지 않을 수 있어요.`)
+  if (!speechOk) notes.push(session.media.speechDetail || SPEECH_REASON[session.media.speech] || "")
+  else notes.push(`속도 변화 기준: ${SPEED_WINDOW_SEC}초 구간 속도가 평균보다 ${Math.round(SPEED_DEVIATION * 100)}% 이상 차이. 전사 구간은 자체 모델의 추정 시간이고, 구간 안의 단어 위치도 추정값이에요.`)
   if (a.gaze?.status === "ok") notes.push(`시선 이탈 기준: 얼굴이 화면을 벗어났거나 크게 돌아간 상태가 ${GAZE_MIN_SEC}초 이상. 얼굴 방향으로 어림잡은 값이에요.`)
   const coaching = session.coaching || {}
   const total = Math.max(1, session.totalSec)
