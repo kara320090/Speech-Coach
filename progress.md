@@ -5,8 +5,9 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 ## 현재 상태
 
 - 실제 서비스 저장소 폴더: https://github.com/kara320090/Speech-Coach (기본 브랜치 main). 학생 PC 저장 공간 부족으로 로컬 clone 없이 GitHub 웹 화면으로 파일을 올림
-- 현재 단계 / 다음 행동: 2단계 2-A 문제 다지기 (팀원 경험 E1의 시점·대응부터 질문 중)
-- 학생에게 확인할 내용: 실제 발표 종료 시간·감점 여부(미확인, 단정 안 함), 10시간에 포함된 "여러 준비 활동"의 구체 내용(학생이 말하지 않아 "대사 암기 등 발표 준비"로만 기록)
+- 현재 단계 / 다음 행동: 학생 지시(2026-10-29)로 문서 갱신 → 구현 → 검증을 한 번에 진행함. 다음: GitHub Actions 결과·공개 배포(Vercel, 학생 로그인 필요)·학생 확인 사항 정리
+- 학생에게 확인할 내용: ① 실제 발표 종료 시간·감점 여부(미확인, 단정 안 함) ② 10시간에 포함된 "여러 준비 활동"의 구체 내용(학생이 말하지 않아 "대사 암기 등 발표 준비"로만 기록) ③ docs/scenarios.yaml의 platform=desktop은 Agent가 학생이 말한 연습 장면(집·빈 강의실, 웹캠 녹화)에서 정한 값이라 학생 확인 필요 ④ 2026-10-29 방향 변경(해법 경로 2도 구현)은 종이 원본이 아니라 이때 새로 정한 결정임
+- 제한: 실제 마이크·웹캠·브라우저 음성 인식 서비스로는 검증하지 못함(가짜 장치·가짜 SpeechRecognition으로만 검증). docker daemon이 없는 작업 공간이라 Dockerfile 빌드는 직접 확인하지 못함(GitHub Actions 결과로 확인 필요). 서비스 AI API(AI_GATEWAY_API_KEY)는 쓰지 않음
 
 ## 1. GitHub 준비
 
@@ -32,21 +33,21 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 - [ ] 외부 자료는 열리는 URL을 sources에 그대로 적고 원문이 주장을 직접 뒷받침하는지 확인, 출처 없는 수치 없음
 - [ ] 문제가 '우리 기능이 없어서'가 아니라 실제 상황·행동으로 서술됐는지 확인
 - [ ] 2-B 해법 찾기: 학생이 낸 해법과 결정을 solution_paths에, 기존 대안 대신 이 해법이어야 하는 이유를 학생 말로 why_ours에 작성
-- [ ] 2-C features에 학생이 고른 해법의 기능별 입력·결과·완료 조건 작성
+- [x] 2-C features에 학생이 고른 해법의 기능별 입력·결과·완료 조건 작성 — F1~F6 (2026-10-29)
 - [x] YAML 문법 검사, 등록된 레포의 기본 브랜치에 docs/problem.yaml push (commit d8dd37f8adbf885953d0c4d4fa083037751427fc)
 - [x] 학생이 개인 로그인으로 우리 팀 → 문제 정의를 열어 캔버스 표시 확인(Agent는 화면을 열 수 없음, 약 1분 캐시) — 2026-10-29 학생이 화면 내용을 보내 줌, 파일과 일치
 - [ ] 핵심 사용자 흐름·기능별 동작 규칙·완료 조건·제외 범위를 팀과 확인
-- [ ] 로그인 필요 여부와 역할 이름(흐름 account·docker 시드 계정 역할 이름으로 씀) 결정
+- [x] 로그인 필요 여부와 역할 이름(흐름 account·docker 시드 계정 역할 이름으로 씀) 결정 — 로그인 없음(Agent 판단, 학생 확인 필요)
 - [ ] 첫 화면에서 알려 줄 것(로그인하지 않은 사람이 `/`에서 볼 서비스 이름·하는 일)을 학생과 정함
-- [ ] 주 사용 플랫폼(desktop·mobile·both)과 실제 사용 장면에 근거한 platformReason 작성
-- [ ] 사용자 핵심 흐름 3~8개를 scenarios.example.yaml 참고해 docs/scenarios.yaml에 작성(steps는 화면의 메뉴·버튼 이름으로 한 줄에 한 동작, 로그인 흐름은 account 지정), YAML 파서로 형식 확인 후 기본 브랜치 push
-- [ ] 서비스의 AI 호출 필요 여부 확인
-- [ ] README 등 기존 문서에 확인된 구현 설계 기록, 기본 브랜치 push
+- [x] 주 사용 플랫폼(desktop·mobile·both)과 실제 사용 장면에 근거한 platformReason 작성 — desktop(Agent 판단, 학생 확인 필요)
+- [x] 사용자 핵심 흐름 3~8개를 scenarios.example.yaml 참고해 docs/scenarios.yaml에 작성(steps는 화면의 메뉴·버튼 이름으로 한 줄에 한 동작, 로그인 흐름은 account 지정), YAML 파서로 형식 확인 후 기본 브랜치 push — S1~S4, 로컬 Playwright 통과
+- [x] 서비스의 AI 호출 필요 여부 확인 — 현재 AI 호출 없음(브라우저 안 처리)
+- [x] README 등 기존 문서에 확인된 구현 설계 기록, 기본 브랜치 push — README에 기록
 - 문제정의·구현 설계 링크 / commit SHA / 확인할 빈칸: https://github.com/kara320090/Speech-Coach/blob/main/docs/problem.yaml / d8dd37f8adbf885953d0c4d4fa083037751427fc / why_ours, P1 source, E1 workaround·feeling·quote, five_whys.symptom, features
 
 ## 3. 최소 화면 docker 실행·CI·첫 배포
 
-- [ ] 설계에 맞는 최소 화면과 서버 실행 구성 준비, Dockerfile 작성(빌드는 Dockerfile에서 끝내고 시작 명령은 서버 실행만)
+- [x] 설계에 맞는 최소 화면과 서버 실행 구성 준비, Dockerfile 작성(빌드는 Dockerfile에서 끝내고 시작 명령은 서버 실행만) — 화면·서버·Dockerfile 작성, 로컬 node 실행으로 검증, docker 빌드는 이 작업 공간에서 못 해 GitHub Actions 확인 대기
 - [ ] docker-compose.example.yml을 docker-compose.yml로 복사: app·db, app만 ports "3000:3000", 앱은 컨테이너 안 3000에서 받음, 앱 설정에 localhost:3000 같은 절대 주소 없음
 - [ ] app 말고는 ports·container_name이 없고, 어느 서비스에도 env_file 없음
 - [ ] 환경변수 이름 그대로(RELEASE_ID·SEED_USER_*·AI_GATEWAY_API_KEY), 시드 계정 값은 `${}` 없이 직접 적음
@@ -85,8 +86,8 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 
 ## 6. 흐름 E2E
 
-- [ ] 키트 e2e/를 저장소 e2e/로 복사, platform에 맞는 project만 남김
-- [ ] 흐름마다 e2e/scenarios/<id>.spec.ts 하나(id와 같은 파일 이름), 파일마다 test 하나
+- [x] 키트 e2e/를 저장소 e2e/로 복사, platform에 맞는 project만 남김 — desktop만
+- [x] 흐름마다 e2e/scenarios/<id>.spec.ts 하나(id와 같은 파일 이름), 파일마다 test 하나 — S1~S4
 - [ ] steps를 같은 순서의 화면 조작으로 spec 본문에 옮김(API 호출 없음), 다른 역할 단계는 새 창(context)으로 로그인, 회원가입 이메일은 실행마다 다르게
 - [ ] page.goto는 창마다 처음 한 번만(로그인 화면으로 가는 goto만 예외), 회원가입은 첫 화면에서 눌러 가거나 회원가입 주소 하나만, 도우미 함수는 test보다 위에
 - [ ] 마지막에 expected 결과를 expect로 확인(화면이 열렸는지만 보지 않음)
