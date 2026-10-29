@@ -30,6 +30,7 @@ AI로 만든 대본의 낯선 표현을 풀어 보고, 자기 설명과 예상 �
 | TXT 대본 불러오기 | main의 파일 선택·편집·녹음 기록 연결을 유지 |
 | PDF·DOCX·TXT 추출 API | `POST /api/scripts/import`, 화면 연결은 후속. [API 안내](docs/script-import-api.md) |
 | 검토 시점↔대본 문장 연결 API | `POST /api/scripts/align`, 외부 AI 없이 전사 앞뒤 구간으로 후보 문장 반환(matched/ambiguous/unmatched). 화면 연결은 후속. [API 안내](docs/script-align-api.md) |
+| 구간 기반 AI 코칭 API | `POST /api/coach/segment`, 사용자가 확인한 대본 위치와 검토 구간으로 상황 질문 → 개념 풀이·확인 질문·답변 검토·연습 행동. 모델 단계는 기존 `/api/coach`(자체 모델) 재사용. 화면 연결은 후속. [API 안내](docs/segment-coach-api.md) |
 | 영상 눈 깜빡임 | MediaPipe를 브라우저에서만 실행. F21, 실제 얼굴 정확도 미검증 |
 | 후속 기획 | 개인 실측 시간에 맞춘 자동 수정, 세부 명제 의미 검사, 코칭·녹음의 완전한 연결, 상황 질문·환경 변경 자동 적용 등. [기능별 구현 범위](docs/local-ai-implementation.md) |
 
