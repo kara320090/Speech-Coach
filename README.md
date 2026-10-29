@@ -4,7 +4,7 @@
 
 실제 Qwen3-4B·faster-whisper-base 가중치는 [GitHub Release](https://github.com/kara320090/Speech-Coach/releases/tag/model-weights-v1)에 라이선스·분할 순서·해시와 함께 배포한다. 기본 평가용 `docker compose up --build`는 모델 다운로드 없는 Node 웹 서버를 시작한다. 기본 AI 공급자는 Gateway이며 키가 없으면 AI 미설정 상태를 안내한다. 자체 CPU 모델을 포함한 별도 실행은 `Dockerfile.selfhosted`와 [복원·CPU Docker 안내](docs/model-distribution.md)를 따른다.
 
-제출 흐름은 시간·구간·전후 비교·재연습과 표시된 예시 체험을 포함한 **8개(S1–S7·S9)**이며 각 ID의 E2E 파일과 연결한다. **[시연용 예시 체험](public/demo.html)**은 키·장치 없이 상황 선택 → 도움말 → 수정 허락 → 대본 확인·적용 → 원문 복원을 제공한다. 준비된 예시임을 계속 표시하며 AI를 호출하지 않는다. 실제 AI 이해·수정·전사 검사는 `e2e/selfhosted`에서 분리한다. [예시 화면 안내](docs/demo-mode.md).
+제출 흐름은 시간·구간·전후 비교·재연습과 표시된 예시 체험을 포함한 **8개(S1–S7·S9)**이며 각 ID의 E2E 파일과 연결한다. **[시연용 예시 체험](public/demo.html)**은 키·장치 없이 상황 선택 → 도움말 → 수정 허락 → 대본 확인·적용 → 원문 복원을 제공한다. 준비된 예시임을 계속 표시하며 AI를 호출하지 않는다. S5는 실제 스튜디오의 대화와 AI 연결 상태를, S6는 영상 파일 분석을 확인한다. 별도 자체 모델 실행 검사는 `e2e/selfhosted`에 있다. [예시 화면 안내](docs/demo-mode.md).
 
 ## 공개 웹과 자체 AI 연결
 
@@ -82,7 +82,7 @@ npm start
 
 ## 검사와 배포 범위
 
-현재 `node --test --test-concurrency=1`: **238개 통과**. 키 없이 실행한 제출 E2E S1–S5·S9 **6개 통과**. S7은 준비된 예시 화면의 선택·허락·수정·저장·복원을 확인하며 실제 추론 검사가 아니다. 과거 실제 모델·미디어 확인 범위는 [진행 기록](progress.md)에 별도로 기록한다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다.
+현재 `node --test --test-concurrency=1`: **238개 통과**. 키 없이 실행한 제출 E2E S1–S7·S9 **8개 통과**. S7은 준비된 예시 화면의 선택·허락·수정·저장·복원을 확인하며 실제 추론 검사가 아니다. 과거 실제 모델·미디어 확인 범위는 [진행 기록](progress.md)에 별도로 기록한다. 실제 사람 얼굴·한국어 발표 정확도, 학습 효과·시간 절감은 별도 검증 범위다.
 
 기본 `docker compose up --build`는 웹과 Gateway 설정을 제공한다. 키가 없어도 기본 연습과 예시 체험은 가능하며 AI 상태는 별도로 안내한다. 공개 Render의 자체 AI 경로는 서명된 운영 PC 에이전트로 코칭·전사를 처리하므로 PC의 `npm run start:agent`와 모델이 실행 중이어야 한다. 새 대본 생성은 별도 Gemini 설정을 사용한다. 검사는 [진행 기록](progress.md)에서 현재 확인 범위를 구분한다.
 
