@@ -45,6 +45,7 @@ h2 { font-size: 1.15rem; margin: 0 0 8px; }
 .field small, .hint { color: var(--muted); font-size: .875rem; }
 fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; padding: 8px 12px 12px; }
 legend { padding: 0 6px; font-weight: 600; }
+input[type="file"] { font: inherit; max-width: 100%; }
 input[type="number"], textarea { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 input[type="number"] { width: 6.5rem; }
 textarea { width: 100%; min-height: 6rem; }
@@ -74,7 +75,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .live dd { margin: 0; }
 .speed-state[data-state="slow"], .speed-state[data-state="fast"] { font-weight: 700; text-decoration: underline; }
 .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
-.preview { max-width: 240px; border-radius: 8px; margin-top: 12px; background: #000; }
+.preview { width: 100%; border-radius: 8px; background: #000; }
+.stage { display: grid; gap: 16px; margin-top: 16px; }
+.stage[data-video="on"][data-script="off"] { max-width: 420px; }
+.script-view h2 { margin-bottom: 6px; }
+.script-text { white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; max-height: 60vh; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 1.05rem; line-height: 1.8; }
+@media (min-width: 760px) {
+  .stage[data-video="on"][data-script="on"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
 meter { width: 160px; }
 
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
