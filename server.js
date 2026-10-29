@@ -1,4 +1,4 @@
-// Node 22 web server with loopback-only, self-hosted model processing. No external AI provider calls.
+// Node 22 web server. /api/coach uses the provider chosen by AI_PROVIDER: local (default, loopback-only self-hosted model) or gemini (Google Gemini API).
 import http from "node:http"
 import fs from "node:fs/promises"
 import { readFileSync } from "node:fs"
@@ -6,7 +6,8 @@ import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createScriptImportHandler } from "./server/script-import.js"
 
-import { createLocalCoach, CoachError, LIMITS } from "./server/local-coach.js"
+import { CoachError, LIMITS } from "./server/local-coach.js"
+import { createCoach } from "./server/coach-provider.js"
 import { createLocalTranscriber } from "./server/local-transcribe.js"
 import { createAgentBroker } from "./server/agent-broker.js"
 
@@ -40,6 +41,11 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
+/** 호출량 제한용 요청자 구분. 프록시(Render 등) 뒤에서는 X-Forwarded-For의 첫 주소를 쓴다(조작 가능해 보조 제한으로만 쓴다). */
+function clientId(req) {
+  return String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "unknown"
+}
+
 async function readBody(req, limit) {
   const chunks = []
   let size = 0
@@ -54,11 +60,11 @@ async function readBody(req, limit) {
 export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env = process.env, fetchImpl = fetch, importLimits, runtime, agentPublicKey } = {}) {
   const agentMode = env.AI_EXECUTION_MODE === "agent" || env.RENDER === "true"
   const broker = agentMode ? createAgentBroker(agentPublicKey || JSON.parse(readFileSync(new URL("./server/agent-public-key.json", import.meta.url), "utf8")).publicKey) : null
-  const inferenceEnv = broker ? { ...env, LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
+  const inferenceEnv = broker ? { ...env, AI_PROVIDER: "local", LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
   const inferenceFetch = broker ? broker.fetch : fetchImpl
-  const coach = createLocalCoach({ env: inferenceEnv, fetchImpl: inferenceFetch })
+  const coach = createCoach({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
-  const frontendOrigins = new Set(["https://speech-coach-kara320090.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
+  const frontendOrigins = new Set(["https://speech-coach-public.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
   const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
 
   async function api(req, res, pathname) {
@@ -84,9 +90,10 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
       if (!body) return sendJson(res, 413, { error: "too-large", message: "입력이 너무 커요. 짧은 구간으로 나누어 주세요." })
       let data
       try { data = JSON.parse(body.toString("utf8")) } catch { return sendJson(res, 400, { error: "invalid-json", message: "요청을 읽지 못했어요." }) }
-      const result = await coach.run(data, controller.signal)
+      const result = await coach.run(data, controller.signal, { client: clientId(req) })
       if (!res.destroyed) sendJson(res, 200, result)
     } catch (e) {
+      if (e?.retryAfter && !res.headersSent) res.setHeader("Retry-After", String(e.retryAfter))
       if (!res.destroyed) sendJson(res, e instanceof CoachError ? e.status : 400, { error: e instanceof CoachError ? e.code : "invalid-request", message: e instanceof CoachError ? e.message : "요청을 처리하지 못했어요. 원문은 보존돼요." })
     } finally { res.off("close", abort) }
   }

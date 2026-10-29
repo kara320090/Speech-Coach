@@ -95,7 +95,7 @@ test("backend-to-agent-to-loopback inference works without provider APIs",async(
     }
     // The transport is exercised by the actual signed agent and a local fixture model.
     const check=await(await fetch(origin+'/api/model-status')).json();assert.equal(check.ready,true)
-    const result=await fetch(origin+'/api/coach',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://speech-coach-kara320090.vercel.app'},body:JSON.stringify({task:'concepts',requestId:'x',versionId:'x',script:'캐시는 결과를 저장한다.',sources:'캐시는 결과를 저장한다.'})})
+    const result=await fetch(origin+'/api/coach',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://speech-coach-public.vercel.app'},body:JSON.stringify({task:'concepts',requestId:'x',versionId:'x',script:'캐시는 결과를 저장한다.',sources:'캐시는 결과를 저장한다.'})})
     assert.equal(result.status,200);assert.equal((await result.json()).result.concepts[0].term,'캐시')
   }finally{await agent.stop();await close(backend);await close(model)}
 })

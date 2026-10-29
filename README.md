@@ -14,7 +14,7 @@
 
 main의 다시봄 화면, TXT 불러오기, 구간 질문·조건 선택·재연습(S9), E2와 공개 조사 기록을 보존했다. 자체 AI 대본 코칭과 선택 전사, 영상 눈 깜빡임을 함께 제공한다. main의 F15는 대본 이해 교차 확인으로 유지하고, PR #3의 눈 깜빡임은 F21로 변경했다. 기존 문서의 미구현 표시는 당시 기록이며, 현재 상태는 이 절과 구현 범위 문서를 따른다. F13–F14 기본 흐름은 구현됐지만 전체 계획 수용 조건이 검증됐다는 뜻은 아니다.
 
-AI로 만든 대본의 낯선 표현을 풀어 보고, 자기 설명과 예상 질문으로 준비하는 **PC·노트북 웹 서비스**다. 공개 모델을 직접 실행하며 외부 AI API 키와 초기 추가 학습을 사용하지 않는다.
+AI로 만든 대본의 낯선 표현을 풀어 보고, 자기 설명과 예상 질문으로 준비하는 **PC·노트북 웹 서비스**다. 기본(`AI_PROVIDER=local`)은 공개 모델을 직접 실행하며 외부 AI API 키와 초기 추가 학습을 사용하지 않는다. 배포 환경에서는 텍스트 AI 코치만 선택적으로 Google Gemini API(`AI_PROVIDER=gemini`, `gemini-2.5-flash`)로 실행할 수 있고, 이때 AI 실행을 누른 대본·자료·답변 텍스트가 Google로 전송된다([Gemini 연결 문서](docs/gemini-coach.md)).
 
 핵심 흐름: **대본·자료 → 개념 선택 → 자기 설명 → 쉬운 대본 → 예상 질문 → 이전·이번 답변 비교**. 군말·말 더듬음·표정으로 이해나 감정을 판정하지 않는다. 모델 결과는 사용자가 근거와 함께 확인할 초안이다.
 
@@ -51,8 +51,10 @@ npm start
 | `LOCAL_AI_TIMEOUT_MS` | 기본 90초, 최대 180초. 동시 코칭 요청은 1개 |
 | `LOCAL_STT_URL` | 같은 호스트 전사 worker 주소, 예 `http://127.0.0.1:8081` |
 | `TRANSCRIBE_TOTAL_SECONDS` | 서버 실행 중 누적 전사 길이, 기본 3600초 |
+| `AI_PROVIDER` | 텍스트 AI 공급자 `local`(기본)·`gemini`. 다른 값이면 AI 코칭 비활성화(자동 전환 없음) |
+| `GEMINI_MODEL`, `GEMINI_API_KEY` | Gemini 모드의 모델(기본 `gemini-2.5-flash`)과 키(서버 환경변수로만 설정, 비밀값). 호출 제한 변수는 [Gemini 연결 문서](docs/gemini-coach.md) |
 
-주소는 loopback만 허용하며 외부 URL·리다이렉트·클라우드 폴백을 사용하지 않는다. 과거 `AI_GATEWAY_API_KEY`, `AI_GATEWAY_URL`, `TRANSCRIBE_MODEL`은 더 이상 읽지 않는다. `.env`는 자동 로드하지 않으므로 실행 환경에 설정하거나 Node의 `--env-file`을 사용한다.
+자체 모델 주소는 loopback만 허용하며 외부 URL·리다이렉트를 쓰지 않는다. 자체 모델이 없을 때 Gemini 등 클라우드로 자동 전환하지 않는다(Gemini는 `AI_PROVIDER=gemini`로 명시했을 때만). 과거 `AI_GATEWAY_API_KEY`, `AI_GATEWAY_URL`, `TRANSCRIBE_MODEL`은 더 이상 읽지 않는다. `.env`는 자동 로드하지 않으므로 실행 환경에 설정하거나 Node의 `--env-file`을 사용한다.
 
 ## 저장·처리 위치
 

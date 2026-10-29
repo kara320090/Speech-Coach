@@ -10,10 +10,11 @@
     "ai:configure": "node local-ai/configure.mjs",
     "ai:pair": "node local-ai/pair-agent.mjs",
     "start:agent": "node --env-file-if-exists=.env local-ai/agent.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "test:gemini-live": "node tests/live/gemini-live-check.mjs"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": "22.x"
   },
   "dependencies": {
     "@fastify/busboy": "3.2.4",
