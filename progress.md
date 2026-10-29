@@ -13,7 +13,9 @@
 - 실제 전사 worker: faster-whisper 1.2.1 base CPU int8, 합성 무음 4초 → 빈 전사 HTTP 200, 약 0.85초. 사람 목소리 정확도 시험은 아니다.
 - 최종 자체 모델 재확인: 쉬운 대본 생성 약 3.93초. 이 개발 예시에서도 원문의 `5분`을 누락해 서버가 `blocked: true`로 분류했다. 자동 수정 품질의 한계가 남으며 직접 보완하기 전에는 적용되지 않는다. 예상 질문을 이전 개념과 잘못 묶지 않도록 수정 후 코칭 브라우저 6개도 재통과했다.
 - 미확인: 실제 얼굴·사람 음성·군말 품질, 학습 효과·시간 절감, 공개 자체 AI 배포·다중 사용자 부하. 시간 기반 대본 수정·환경 조정 전체 기능도 후속이다.
-- GitHub 반영·CI는 실제 실행 후 아래에 추가 기록한다. 이 문장 자체를 push·배포 성공의 근거로 쓰지 않는다.
+- 코드 commit `c42ffb9`를 `feat/local-ai-script-coach`에 push하고 [PR #6](https://github.com/kara320090/Speech-Coach/pull/6)을 생성했다. PR #3의 `codex/blink-filler-analysis`를 기준으로 한 후속 PR이며, #3 병합 뒤 main으로 기준을 옮겨 검토한다.
+- 코드 commit `c42ffb9`의 [GitHub Actions](https://github.com/kara320090/Speech-Coach/actions/runs/40894975620) 성공: Docker 기동·health·S1–S4 **4개 통과**(18.5초). 이 결과를 기록하는 후속 commit은 문서만 변경한다.
+- 제출 시 main에는 별도 문서 변경 `efb41ea`가 있었다. 이 작업에서 main을 수정하거나 병합하지 않았다. 후속 병합 시 병행 문서 변경과 최신 문제 정의의 정합성을 확인해야 한다. 공개 배포는 수행하지 않았다.
 
 
 
