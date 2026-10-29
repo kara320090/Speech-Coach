@@ -1,5 +1,5 @@
-# Render serves the web/API and authenticates the self-hosted inference PC.
-# Model files and private signing keys remain on the inference PC.
+# Render serves web/API and calls the organizer AI Gateway directly.
+# The Gateway key is supplied as a secret environment variable; no inference PC is needed.
 services:
   - type: web
     name: speech-coach
@@ -14,11 +14,11 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: AI_EXECUTION_MODE
-        value: agent
       - key: AI_PROVIDER
-        value: local
-      - key: GEMINI_MODEL
-        value: gemini-3.8-flash
-      - key: GEMINI_API_KEY
+        value: gateway
+      - key: AI_GATEWAY_TEXT_MODEL
+        value: google/gemini-3.8-flash
+      - key: AI_GATEWAY_TRANSCRIBE_MODEL
+        value: google/gemini-3.5-transcribe
+      - key: AI_GATEWAY_API_KEY
         sync: false
