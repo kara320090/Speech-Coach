@@ -77,7 +77,7 @@ test.describe("영상·소리 파일 불러오기", () => {
     await expect(items).toContainText('"음악"')
     await expect(page.getByTestId("avg-speed")).toContainText("음절/분")
     await expect(page.getByText("인식된 글 보기")).toBeVisible()
-    await expect(page.getByText("자체 음성 인식 서버에서 글자로 바꿨어요")).toBeVisible()
+    await expect(page.getByText("소리 조각을 서버에 설정된 음성 인식으로 글자로 바꿨어요. 오인식이 있을 수 있어요.")).toBeVisible()
   })
 
   test("자체 전사 worker가 없으면 글자 변환만 건너뛰고 긴 침묵 찾기는 그대로 한다", async ({ page }) => {
