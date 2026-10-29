@@ -241,3 +241,10 @@
 - 구현: `server/script-align.js`(입력 검사·문장/문단과 원문 위치·정규화·글자 2-gram 유사도·Viterbi 단조 정렬과 forward-backward 후보·지점 연결·HTTP 처리기), `server.js`는 라우트만. 외부 AI 없음, 저장·로그 없음, 원문·기록 수정 없음. 결과는 matched/ambiguous/unmatched와 후보·근거·앞뒤 발화, `script-align-v1`. 문서: [docs/script-align-api.md](docs/script-align-api.md).
 - 확인한 것: `node --test` 155개 통과(새 13개, 실제 HTTP 포함 합성 사례). 네트워크 감시로 Google 요청 0건. 최대 작업량 합성 측정 약 0.2초·응답 약 400KB.
 - 한계: 합성 데이터만 확인했고 실제 발표 정확도는 검증하지 않았다. 숫자·영어 읽기 차이, 크게 바꿔 말하기, 여러 문장에 걸친 전사 구간에 약하다. 화면 연결 전.
+
+## 22. 구간 기반 AI 코칭 API (브랜치 `feat/segment-coaching`, 백엔드만)
+
+- 요청(2026-10-30): 사용자가 확인한 대본 연결 결과와 영상 검토 구간으로 “이 부분에서 어떤 일이 있었나요?”를 묻고 답에 따라 개념 확인·쉬운 설명·다음 연습 행동을 준다. 침묵만으로 이해 부족·긴장을 판단하지 않는다.
+- 구현: `server/segment-coach.js`(입력 검사·사용자 확인 요구·선택 문장 위치 일관성·이력 섞임 검사·흐름 규칙·후속 질문 3회 상한·요약 분리). 글 생성 단계는 기존 `/api/coach` 서비스의 concepts·question·review를 그대로 호출해 모델 선택·인용 검증·동시 처리·타임아웃·오류 처리를 재사용했다(새 모델 호출부 없음, Gemini 미사용). `server.js`는 라우트와 이 경로의 본문 한도(128KB)만 추가. 문서: [docs/segment-coach-api.md](docs/segment-coach-api.md).
+- 확인한 것: `node --test` 171개 통과(새 16개, 실제 HTTP로 대본 연결 → 구간 코칭, 가짜 자체 모델 응답). 네트워크 감시로 Google 요청 0건.
+- 한계: 대화 이력·사용자 확인은 클라이언트 값이라 질문 상한은 완전한 서버 보장이 아니다. 실제 모델 응답 품질과 발표 효과는 검증하지 않았다. 화면 연결 전.
