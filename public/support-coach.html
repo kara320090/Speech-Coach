@@ -2,7 +2,7 @@
 <html lang="ko">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>함께 살펴보는 발표 · 다시봄</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/coach.css"><link rel="stylesheet" href="/support.css"></head>
 <body>
-  <header class="top"><a class="brand" href="/">다시봄</a><nav aria-label="주 메뉴"><a href="/">발표 연습</a><a href="/coach.html">자체 AI 이해 연습</a></nav></header>
+  <header class="top"><a class="brand" href="/">다시봄</a><nav aria-label="주 메뉴"><a href="/">발표 연습</a><a href="/coach.html">대본 이해 연습</a></nav></header>
   <main class="coach-wrap">
     <p class="eyebrow">내 상황에 맞는 다음 한 걸음</p><h1>잠깐 멈춘 곳, 함께 풀어볼까요?</h1>
     <p>표현이 낯설었는지, 다음 문장이 생각나지 않았는지, 잠시 쉬고 싶었는지는 본인이 가장 잘 알아요. AI가 먼저 묻고 답에 맞춰 함께 정리해요.</p>
@@ -22,14 +22,14 @@
       <label>내용 확인에 사용할 근거 자료 (선택)<textarea id="support-sources" rows="4" maxlength="2400"></textarea></label>
       <h3>연습에서 표시된 관찰 후보</h3><ul id="support-observations"></ul><p>관찰은 원인을 뜻하지 않아요. 대본 위치와 맞는지 직접 확인하고, 해당하지 않는 관찰은 선택 해제할 수 있어요.</p>
       <label>함께 정리하고 싶은 상황 (선택)<textarea id="support-context" rows="2" maxlength="600" placeholder="예: AI가 만든 대본의 용어를 제 말로 설명하고 싶어요."></textarea></label>
-      <fieldset id="engine-choice"><legend>대화할 AI</legend>
-        <label><input type="radio" name="engine" id="engine-local" value="local" checked> 자체 AI와 대화하기 · 외부로 보내지 않아요</label>
-        <label><input type="radio" name="engine" id="engine-gemini" value="gemini"> Gemini와 대화하기 · 동의한 텍스트만 Google로 보내요</label>
+      <fieldset id="engine-choice"><legend>대화 방식</legend>
+        <label><input type="radio" name="engine" id="engine-local" value="local" checked> 선택한 구간을 확인하며 대화하기</label>
+        <label><input type="radio" name="engine" id="engine-gemini" value="gemini"> 대본을 자유롭게 살펴보기</label>
       </fieldset>
-      <p id="local-notice">직접 운영하는 자체 AI가 확인한 대본 위치와 관찰을 보고 먼저 상황을 물어요. 대본·답변은 외부 AI 제공자에게 보내지 않아요.</p>
+      <p id="local-notice">처리 위치를 확인하고 있어요.</p>
       <div id="gemini-consent" hidden>
-      <label><input id="share-support" type="checkbox"> 선택한 대본·근거·관찰 텍스트와 이 대화의 답변을 Google Gemini로 보내는 데 동의해요</label>
-      <p id="support-notice">이 기능은 Gemini 3.8 Flash를 사용해요. 녹음·영상·얼굴은 전송하지 않아요. 기존 녹화 분석·전사와 자체 AI 이해 연습은 별도로 유지돼요.</p>
+      <label><input id="share-support" type="checkbox"><span id="share-support-label"> 선택한 대본·근거·관찰 텍스트와 이 대화의 답변을 Google Gemini로 보내는 데 동의해요</span></label>
+      <p id="support-notice">이 기능은 Gemini 3.8 Flash를 사용해요. 녹음·영상·얼굴은 전송하지 않아요. 기존 녹화 분석·전사와 대본 이해 연습은 별도로 유지돼요.</p>
       </div>
       <div class="coach-actions"><button id="start-support" type="button" disabled>함께 살펴보기</button><button id="cancel-support" type="button" hidden>응답 기다리기 취소</button></div>
       <p id="support-state" role="status" aria-live="polite"></p>
@@ -50,6 +50,6 @@
       <div class="coach-actions"><button id="apply-support" type="button" disabled>수정본으로 다음 연습 준비</button><button id="discard-support" type="button">초안은 사용하지 않을게요</button></div>
       <p>선택한 부분만 바꾸고 나머지 대본은 유지해요. 지난 녹음·측정값·당시 대본은 바꾸지 않아요.</p>
     </section>
-    <section class="coach-panel"><h2>내가 고른 방식으로 이어가기</h2><div class="coach-actions"><a href="/">발표 연습으로</a><a id="back-result" href="/">연습 결과로</a><a href="/coach.html">자체 AI로 개념·질문 연습</a><button id="undo-support" type="button" hidden>직전 적용 전 대본으로 되돌리기</button><button id="clear-support" type="button">이 탭의 대화 지우기</button></div><p>대화는 이 탭에 임시 보관해요. 원인을 확정하거나 발표 능력·감정을 평가하지 않아요.</p></section>
+    <section class="coach-panel"><h2>내가 고른 방식으로 이어가기</h2><div class="coach-actions"><a href="/">발표 연습으로</a><a id="back-result" href="/">연습 결과로</a><a href="/coach.html">개념·질문 연습</a><button id="undo-support" type="button" hidden>직전 적용 전 대본으로 되돌리기</button><button id="clear-support" type="button">이 탭의 대화 지우기</button></div><p>대화는 이 탭에 임시 보관해요. 원인을 확정하거나 발표 능력·감정을 평가하지 않아요.</p></section>
   </main><script type="module" src="/js/support-page.js"></script>
 </body></html>

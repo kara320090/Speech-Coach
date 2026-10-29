@@ -51,3 +51,6 @@
 키가 필요한 선택 기능이므로 제출 8개 기본 시나리오에 필수로 넣지 않는다. 기존 무키·무장치 Docker 흐름과 자체 모델 검사를 유지한다. 실제 공개 Gemini 호출 결과는 `progress.md`에 별도로 기록한다.
 
 Gemini 3.8은 지원되는 low thinking을 사용하며, [공식 마이그레이션 안내](https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.8)에 따라 3.6+ 모델에는 폐기 예정인 sampling 인자를 보내지 않는다. 모델·과금 등급을 자동 변경하거나 생성 요청을 자동 반복하지 않는다.
+
+### Gateway 공급자와 구간 대화 UI
+구간 대화/자유 대화는 사용자 흐름의 구분이며 공급자 선택이 아니다. 실제 공급자는 서버 설정을 따른다. 화면은 `/api/model-status`와 도움 대화 상태의 실제 모델·처리 안내를 사용한다. 외부 처리에서는 전송 동의 후에만 구간 대화·문단 수정 요청을 보낸다. 녹음 전사의 조각 단위 `timingPrecision`은 위치 확인 API에도 전달한다. 화면 연결은 별도 `support-coach.html`에서 이루어지며, 메인 영상 아래 인라인 채팅은 아직 아니다.

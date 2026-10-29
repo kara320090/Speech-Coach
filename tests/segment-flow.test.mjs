@@ -38,3 +38,8 @@ test("scriptVersionIdFor·canApply: 같은 대본·같은 원문일 때만 적�
   assert.equal(await canApply(SCRIPT, { ...apply, originalSha256: "0".repeat(64) }), false)
   assert.equal(await canApply(SCRIPT, null), false)
 })
+
+
+test("toSegments preserves chunk timing for conservative alignment", () => {
+  assert.deepEqual(toSegments([{ startSec: 20, endSec: 40, text: "음 발표", timingPrecision: "chunk" }]), [{ startSecond: 20, endSecond: 40, text: "음 발표", timingPrecision: "chunk" }])
+})

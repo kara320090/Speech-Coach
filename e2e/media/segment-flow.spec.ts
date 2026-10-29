@@ -11,7 +11,10 @@ const SCRIPT = `${P0}\n\n${P1}\n\n${P2}`
 const REVISED = "이 서비스는 결과를 잠시 저장해 다시 쓰는 캐시를 이용해요. 최근 결과를 5분 동안 저장해요. 같은 요청이 오면 저장한 결과를 다시 써서 응답이 빨라져요. 다만 효과는 아직 검증하지 않았어요."
 const sha = (t: string) => createHash("sha256").update(t, "utf8").digest("hex")
 
-async function seedSession(page: Page, { transcript = true } = {}) {
+async function seedSession(page: Page, { transcript = true, gateway = false } = {}) {
+  await page.route("**/api/model-status", route => route.fulfill({ json: gateway
+    ? { provider: "ai-gateway", ready: true, model: "google/gemini-3.8-flash", processingNotice: "선택한 텍스트를 주최 측 Vercel AI Gateway를 거쳐 Google로 보내요." }
+    : { provider: "local", ready: true, model: "speech-coach", processingNotice: "자체 모델로 처리해요." } }))
   await page.goto("/")
   await page.evaluate(({ SCRIPT, transcript }) => new Promise<void>((resolve, reject) => {
     const req = indexedDB.open("speech-coach", 1)
@@ -63,7 +66,7 @@ test("검토 구간 → 위치 확인 → 자체 AI 대화 → 문단 수정안 
   await expect(page.locator("#location-state")).toContainText("이 문장 근처로 보여요")
   const recommended = page.getByRole("radio", { name: /이 서비스는 캐시를 이용해/ })
   await expect(recommended).toBeChecked()
-  await expect(page.getByLabel("자체 AI와 대화하기 · 외부로 보내지 않아요")).toBeChecked()
+  await expect(page.getByLabel("선택한 구간을 확인하며 대화하기")).toBeChecked()
   await expect(page.locator("#gemini-consent")).toBeHidden()
   await page.getByRole("button", { name: "이 위치로 확인" }).click()
   await expect(page.getByLabel("함께 볼 대본", { exact: true })).toHaveValue(P1)
@@ -138,11 +141,31 @@ test("Gemini 대화도 같은 화면에서 고를 수 있고, 동의 전에는 �
   await seedSession(page)
   await page.goto("/support-coach.html?session=s-flow&item=silence-1")
   await page.getByRole("button", { name: "이 위치로 확인" }).click()
-  await page.getByLabel("Gemini와 대화하기 · 동의한 텍스트만 Google로 보내요").check()
+  await page.getByLabel("대본을 자유롭게 살펴보기").check()
   await expect(page.locator("#gemini-consent")).toBeVisible()
   const start = page.getByRole("button", { name: "동의하고 함께 살펴보기" })
   await expect(start).toBeDisabled()
   await page.getByLabel("선택한 대본·근거·관찰 텍스트와 이 대화의 답변을 Google Gemini로 보내는 데 동의해요").check()
   await expect(start).toBeEnabled()
   await expect(page.getByLabel("함께 볼 대본", { exact: true })).toHaveValue(P1)
+})
+
+
+test("Gateway segment mode shows external processing and requires consent before dialogue", async ({ page }) => {
+  const requests: any[] = []
+  await page.route("**/api/coach/segment", async route => { requests.push(route.request().postDataJSON()); await route.continue() })
+  await seedSession(page, { gateway: true })
+  await page.goto("/support-coach.html?session=s-flow&item=silence-1")
+  await expect(page.locator("#local-notice")).toContainText("Vercel AI Gateway")
+  await expect(page.locator("#support-model")).toContainText("google/gemini-3.8-flash")
+  await page.getByRole("button", { name: "이 위치로 확인" }).click()
+  await expect(page.locator("#gemini-consent")).toBeVisible()
+  await expect(page.locator("#start-support")).toBeDisabled()
+  expect(requests.length).toBe(0)
+  await page.locator("#share-support").check()
+  await page.locator("#start-support").click()
+  await expect(page.locator("#support-messages")).toContainText("이 부분에서 어떤 일이 있었나요?")
+  expect(requests.length).toBe(1)
+  await page.locator("#share-support").uncheck()
+  await expect(page.locator("#answer-support")).toBeDisabled()
 })

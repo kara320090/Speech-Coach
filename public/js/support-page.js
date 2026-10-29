@@ -8,6 +8,7 @@ const $ = id => document.getElementById(id), params = new URLSearchParams(locati
 const practiceId = params.get("session") || "", itemId = params.get("item") || "", cacheKey = `support-dialogue:${practiceId}:${itemId}`
 let ready = false, pending = null, serial = 0, history = [], reply = null, proposal = null, ended = false, declined = false, versionId = crypto.randomUUID(), fullScript = "", chunks = [], selected = null
 // 자체 AI 구간 대화(기본): 대본 위치 확인 → /api/coach/segment → /api/scripts/revise-segment
+let segmentExternal = false, segmentStatusKnown = false, supportNotice = "", segmentNotice = "", supportModelText = "연결을 확인하고 있어요.", segmentModelText = "연결을 확인하고 있어요."
 let engine = "local", localReady = false, seg = null, segHistory = [], segLast = null, segDone = false, paragraph = null, sentences = [], session = null, item = null
 const node = (tag, text) => { const e = document.createElement(tag); e.textContent = text; return e }
 const say = text => { $("support-state").textContent = text }
@@ -18,21 +19,24 @@ function remember() {
 function controls() {
   $("support-answer").disabled = Boolean(pending)
   const gemini = engine === "gemini"
-  $("gemini-consent").hidden = !gemini
+  $("support-model").textContent = gemini ? supportModelText : segmentModelText
+  const consentRequired = gemini || segmentExternal
+  $("gemini-consent").hidden = !consentRequired
+  $("support-notice").textContent = gemini ? supportNotice : segmentNotice
   $("local-notice").hidden = gemini
-  $("start-support").textContent = gemini ? "동의하고 함께 살펴보기" : "함께 살펴보기"
+  $("start-support").textContent = consentRequired ? "동의하고 함께 살펴보기" : "함께 살펴보기"
   const allowed = ready && $("share-support").checked && !pending && $("support-script").value.trim().length >= 3
   if (gemini) {
     $("start-support").disabled = !allowed
     $("answer-support").disabled = !allowed || ended || !reply?.question || history.filter(h => h.role === "user").length >= 3
     $("accept-rewrite").disabled = !allowed || !history.some(h => h.role === "user")
   } else {
-    $("start-support").disabled = Boolean(pending) || !seg
-    $("answer-support").disabled = Boolean(pending) || segDone || segLast?.message.kind !== "question"
+    $("start-support").disabled = Boolean(pending) || !seg || !segmentStatusKnown || (consentRequired && !$("share-support").checked)
+    $("answer-support").disabled = Boolean(pending) || segDone || (segmentExternal && !$("share-support").checked) || segLast?.message.kind !== "question"
   }
   $("unknown-support").hidden = $("explain-support").hidden = gemini || !segHistory.length
-  $("unknown-support").disabled = $("explain-support").disabled = gemini || Boolean(pending) || segDone || !segLast
-  $("request-revision").disabled = Boolean(pending)
+  $("unknown-support").disabled = $("explain-support").disabled = gemini || Boolean(pending) || segDone || !segLast || (segmentExternal && !$("share-support").checked)
+  $("request-revision").disabled = Boolean(pending) || (engine === "local" && (!localReady || (segmentExternal && !$("share-support").checked)))
   $("cancel-support").hidden = !pending
   for (const el of document.querySelectorAll("#support-hints button")) el.disabled = gemini ? $("answer-support").disabled : Boolean(pending) || segDone
   const check = proposal && checkRevision(proposal.original, $("support-proposal").value)
@@ -60,20 +64,28 @@ function resetDialogue() {
 function changed() {
   cancel("자료가 바뀌었어요. 새 기준으로 함께 살펴보기를 눌러 주세요.")
   resetDialogue()
-  if (seg && $("support-script").value !== paragraph?.text) { seg = null; $("location-confirmed").textContent = "대본을 직접 고쳐서 확인한 위치를 해제했어요. 자체 AI 대화는 위치를 다시 확인한 뒤 시작할 수 있어요." }
+  if (seg && $("support-script").value !== paragraph?.text) { seg = null; $("location-confirmed").textContent = "대본을 직접 고쳐서 확인한 위치를 해제했어요. 구간 대화는 위치를 다시 확인한 뒤 시작할 수 있어요." }
   remember(); showDialogue()
 }
 async function refresh() {
+  segmentStatusKnown = false
+  controls()
   try {
     const res = await fetch("/api/coach/support-status"), info = await res.json()
     ready = res.ok && info.ready === true
-    $("support-model").textContent = `${info.model || "Gemini"} · ${info.message || "연결 상태를 확인하지 못했어요."}`
-  } catch { ready = false; $("support-model").textContent = "서버에 연결하지 못했어요. 대본은 유지되며 자체 AI 연습을 선택할 수 있어요." }
+    supportNotice = info.processingNotice || "선택한 대본·근거·관찰·답변을 외부 AI로 보내요. 녹음·영상·얼굴은 보내지 않아요."
+    supportModelText = `${info.model || "Gemini"} · ${info.message || "연결 상태를 확인하지 못했어요."}`
+  } catch { ready = false; supportModelText = "서버에 연결하지 못했어요. 대본은 유지돼요." }
   try {
     const res = await fetch("/api/model-status"), info = await res.json()
+    segmentStatusKnown = res.ok
     localReady = res.ok && info.ready === true
-    $("local-notice").textContent = `${localReady ? "자체 AI를 사용할 수 있어요." : "자체 AI 모델이 아직 준비되지 않았어요. 상황 질문과 연습 제안은 받을 수 있고, 풀이·수정안은 모델이 준비된 뒤 받을 수 있어요."} 대본·답변은 외부 AI 제공자에게 보내지 않아요.`
-  } catch { localReady = false }
+    segmentExternal = info.provider !== "local"
+    segmentModelText = `${info.model || "AI"} · ${info.message || "연결 상태를 확인하지 못했어요."}`
+    segmentNotice = info.processingNotice || (segmentExternal ? "선택한 대본·자료·답변은 외부 AI로 전송돼요." : "자체 모델로 처리해요.")
+    $("local-notice").textContent = `${localReady ? "AI 코칭을 사용할 수 있어요." : "모델이 준비되지 않아 풀이·수정안을 받을 수 없어요. 규칙형 상황 질문은 사용할 수 있어요."} ${segmentNotice}`
+    $("share-support-label").textContent = " 선택한 대본·근거·관찰 텍스트와 이 대화의 답변을 Google Gemini로 보내는 데 동의해요"
+  } catch { localReady = false; segmentStatusKnown = false; segmentModelText = "서버에 연결하지 못했어요."; $("local-notice").textContent = "처리 위치를 확인하지 못했어요. 연결 다시 확인을 눌러 주세요." }
   controls()
 }
 
@@ -159,16 +171,16 @@ async function prepareLocation() {
     remember(); showDialogue()
   }
 }
-const strip = g => ({ startSecond: g.startSecond, endSecond: g.endSecond, text: g.text })
+const strip = g => ({ startSecond: g.startSecond, endSecond: g.endSecond, text: g.text, ...(g.timingPrecision === "chunk" ? { timingPrecision: "chunk" } : {}) })
 
 /* ───────── 자체 AI: 구간 대화 ───────── */
 async function step(action, turn = null) {
-  if (pending || !seg) return
+  if (pending || !seg || !segmentStatusKnown || (segmentExternal && !$("share-support").checked)) return
   const token = ++serial
   seg.sources = $("support-sources").value.trim()
   const prior = segLast ? [...segHistory] : [] // 이번 답은 action으로만 보내고, 응답을 받은 뒤 이력에 넣는다
   pending = new AbortController(); controls()
-  say("자체 AI가 확인한 위치와 지금까지의 대화를 보고 있어요.")
+  say("확인한 위치와 지금까지의 대화를 살펴보고 있어요.")
   try {
     const body = await segmentStep(seg, prior, action, pending.signal)
     if (token !== serial) return
@@ -176,7 +188,7 @@ async function step(action, turn = null) {
     segHistory = [...prior, ...(turn ? [turn] : []), body.message]
     segLast = body; segDone = body.done
     $("support-answer").value = ""
-    say(body.model === "rule" ? "다음 질문이에요. 모르겠다고 하거나 건너뛰어도 괜찮아요." : `자체 AI(${body.model})의 답이에요. 원인은 본인의 설명으로만 확인해요.`)
+    say(body.model === "rule" ? "다음 질문이에요. 모르겠다고 하거나 건너뛰어도 괜찮아요." : `AI(${body.model})의 답이에요. 원인은 본인의 설명으로만 확인해요.`)
     showDialogue()
     $("support-dialogue").scrollIntoView({ behavior: "smooth", block: "start" })
   } catch (error) { if (token === serial) say(error.name === "AbortError" ? "기다리기를 취소했어요." : error.message) }
@@ -214,7 +226,7 @@ const segLabel = reason => ({ "intended-pause": "일부러 쉬었어요", "forgo
 
 /* ───────── 자체 AI: 문단 수정안 ───────── */
 async function revise(focus = []) {
-  if (pending || !seg || !paragraph) return
+  if (pending || !seg || !paragraph || !localReady || (segmentExternal && !$("share-support").checked)) return
   const token = ++serial
   pending = new AbortController(); controls()
   say("나눈 대화를 반영해 이 문단만 고친 초안을 만들고 있어요.")
@@ -224,10 +236,10 @@ async function revise(focus = []) {
     if (body.scriptVersionId !== seg.scriptVersionId || body.pointId !== seg.point.id || body.target.start !== paragraph.start || body.target.end !== paragraph.end) throw new Error("다른 대본이나 구간의 수정안이라 적용하지 않았어요.")
     $("revise-focus").replaceChildren()
     if (body.status === "proposed") {
-      showProposal({ original: paragraph.text, model: body.model, requestId: body.requestId, result: { rewritten: body.revision.text }, apply: body.apply, serverWarnings: body.preservation.warnings, origin: "self-hosted-segment-revision" },
+      showProposal({ original: paragraph.text, model: body.model, requestId: body.requestId, result: { rewritten: body.revision.text }, apply: body.apply, serverWarnings: body.preservation.warnings, origin: "segment-revision" },
         [body.revision.reason, ...body.basis.evidence.map(e => `제공 자료의 인용: ${e.quote}`), ...body.basis.unverified, body.preservation.blocked ? "자동 검사에서 수치·보존 문구 변경이 발견돼 그대로는 적용할 수 없어요. 직접 고쳐 주세요." : ""])
       $("revise-offer").hidden = true
-      say(`수정 초안을 받았어요. 자체 AI(${body.model}) · 원문과 비교해 확인한 뒤에만 적용해요.`)
+      say(`수정 초안을 받았어요. AI(${body.model}) · 원문과 비교해 확인한 뒤에만 적용해요.`)
     } else {
       $("revise-offer-text").textContent = body.reasons.join(" ")
       for (const c of body.choices || []) { const b = node("button", c.label); b.type = "button"; b.onclick = () => revise([c.value]); $("revise-focus").append(b) }
@@ -320,7 +332,7 @@ try { const saved = JSON.parse(sessionStorage.getItem(cacheKey) || "null"); if (
 // 자체 AI 구간 대화는 연습 기록의 검토 구간에서만 시작할 수 있다(위치 확인이 필요). 그 밖에는 기존 Gemini 대화를 쓴다.
 if (!session || !item || fullScript.length > 20000) {
   $("engine-local").disabled = true
-  $("local-notice").textContent = "자체 AI 구간 대화는 연습 결과에서 검토 구간을 고른 뒤 시작할 수 있어요."
+  $("local-notice").textContent = "구간 대화는 연습 결과에서 검토 구간을 고른 뒤 시작할 수 있어요."
   engine = "gemini"
   $("engine-gemini").checked = true
 } else await prepareLocation()

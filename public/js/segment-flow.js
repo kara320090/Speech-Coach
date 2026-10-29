@@ -20,7 +20,7 @@ export function toSegments(transcript) {
   return (Array.isArray(transcript) ? transcript : [])
     .filter((s) => s && typeof s.text === "string" && s.text.trim() && Number.isFinite(s.startSec) && Number.isFinite(s.endSec) && s.endSec >= s.startSec && s.startSec >= 0)
     .slice(0, 2000)
-    .map((s) => ({ startSecond: s.startSec, endSecond: s.endSec, text: s.text.slice(0, 1000) }))
+    .map((s) => ({ startSecond: s.startSec, endSecond: s.endSec, text: s.text.slice(0, 1000), ...(s.timingPrecision === "chunk" ? { timingPrecision: "chunk" } : {}) }))
 }
 
 /** 결과 화면의 검토 항목을 검토 지점으로. 관찰 사유 이름이 다르면 '구간 시간'으로 둔다. */
