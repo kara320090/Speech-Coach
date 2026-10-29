@@ -216,3 +216,15 @@ test("저장·로그 없음: 같은 요청을 두 번 보내도 같은 결과이
   assert.equal(JSON.stringify(req), frozen)
   for (const s of ["도서관", "대출 기간", "silence-1"]) assert.ok(!logged.some((l) => l.includes(s)), `로그에 '${s}'`)
 })
+
+test("chunk estimates cannot establish the sentence at a review timestamp", () => {
+  const r = run({ segments: NORMAL.map(s => ({ ...s, timingPrecision: "chunk" })), points: [{ id: "pause", startSecond: 10.5, endSecond: 13 }] })
+  const p = point(r, "pause")
+  assert.equal(p.status, "ambiguous")
+  assert.equal(p.primarySentenceId, null)
+  assert.equal(p.timingPrecision, "chunk")
+  assert.ok(p.candidates.length)
+  assert.ok(p.reasons.some(r => r.code === "coarse-timing"))
+  assert.ok(r.segments.every(s => s.timingPrecision === "chunk"))
+  assert.throws(() => validateAlignInput({ script: SCRIPT, scriptVersionId: "v", segments: [{ ...NORMAL[0], timingPrecision: "exact-word" }], points: [{ id: "p", startSecond: 0, endSecond: 1 }] }))
+})

@@ -73,3 +73,18 @@ test("server errors and quota limits never become measured zero", async () => {
     assert.notEqual(result.status, "ok"); assert.equal(result.transcript.fillers.count, null)
   }
 })
+
+test("text-only Gateway transcription keeps totals but never invents word timings or speed-change windows", async () => {
+  const result = await analyzeRecordedSpeech({ ...input(45), fetchFn: async url => url === "/api/model-status"
+    ? new Response(JSON.stringify({ transcriptionConfigured: true, transcription: { provider: "ai-gateway" } }))
+    : new Response(JSON.stringify({ text: "음 어 도서관 도서관 도서관 내용을 설명합니다", segments: [] })) })
+  assert.equal(result.status, "ok")
+  assert.ok(result.transcript.overallRate > 0)
+  assert.ok(result.transcript.fillers.count > 0)
+  assert.ok(result.segments.every(s => s.timingPrecision === "chunk"))
+  assert.deepEqual(result.transcript.windows, [])
+  assert.deepEqual(result.transcript.items, [])
+  assert.deepEqual(result.fillers.times, [])
+  assert.ok(result.fillers.items.every(i => i.timingPrecision === "chunk" && i.endSec > i.startSec))
+  assert.match(result.detail, /추정 범위/)
+})

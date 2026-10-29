@@ -67,10 +67,11 @@ npm start
 | `LOCAL_STT_URL` | 같은 호스트 전사 worker 주소, 예 `http://127.0.0.1:8081` |
 | `TRANSCRIBE_TOTAL_SECONDS` | 서버 실행 중 누적 전사 길이, 기본 3600초 |
 | `SUPPORT_GEMINI_TIMEOUT_MS` | 선택한 도움 대화만 기본 105초·최대 110초. 기다리는 중 취소 가능 |
-| `AI_PROVIDER` | 호환 설정 `local`. 코칭은 이 값과 관계없이 자체 모델만 사용 |
+| `AI_PROVIDER` | 기본 `local`(코칭·전사는 자체 모델). `gateway`면 모든 AI 호출을 주최 측 Vercel AI Gateway로 보냄 |
+| `AI_GATEWAY_API_KEY`, `AI_GATEWAY_TEXT_MODEL`, `AI_GATEWAY_TRANSCRIBE_MODEL` | Gateway 키(서버 환경변수에서만)와 모델(기본 `google/gemini-3.8-flash`, `google/gemini-3.5-transcribe`). [Gateway 설정](docs/ai-gateway.md) |
 | `GEMINI_MODEL`, `GEMINI_API_KEY` | 새 대본·동의한 상황 대화 모델(기본 `gemini-3.8-flash`)과 키. 서버 환경변수에서만 읽음. [생성 설정](docs/gemini-coach.md) |
 
-자체 모델 주소는 loopback만 허용하며 외부 URL·리다이렉트를 쓰지 않는다. 자체 모델이 없을 때 Gemini 등 클라우드로 자동 전환하지 않는다(Gemini는 별도 선택한 새 대본 생성·상황 대화 API에서만 사용). 과거 `AI_GATEWAY_API_KEY`, `AI_GATEWAY_URL`, `TRANSCRIBE_MODEL`은 더 이상 읽지 않는다. `.env`는 자동 로드하지 않으므로 실행 환경에 설정하거나 Node의 `--env-file`을 사용한다.
+자체 모델 주소는 loopback만 허용하며 외부 URL·리다이렉트를 쓰지 않는다. 자체 모델이 없을 때 Gemini 등 클라우드로 자동 전환하지 않는다(Gemini는 별도 선택한 새 대본 생성·상황 대화 API에서만 사용). `AI_GATEWAY_API_KEY`는 `AI_PROVIDER=gateway`일 때만 읽고, 과거 `AI_GATEWAY_URL`, `TRANSCRIBE_MODEL`은 읽지 않는다. `.env`는 자동 로드하지 않으므로 실행 환경에 설정하거나 Node의 `--env-file`을 사용한다.
 
 ## 저장·처리 위치
 
