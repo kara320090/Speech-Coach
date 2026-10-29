@@ -7,7 +7,8 @@ import {
 } from "./analysis.js"
 import { MediaCapture, SpeechCapture } from "./recorder.js"
 import { deleteSession, getSession, listSessions, saveSession } from "./storage.js"
-import { readScriptFile, scriptForPractice, sessionScript } from "./script.js"
+import { scriptForPractice } from "./script.js"
+import { createScriptInput, practiceStage, scriptPrefill, scriptResultCard } from "./script-ui.js"
 
 const app = document.getElementById("app")
 const state = { practice: null, prefill: null, starting: false }
@@ -73,7 +74,7 @@ function renderSetup() {
   syncVideo()
   const plan = h("textarea", { id: "f-plan", rows: "4", placeholder: "예) 도입 2:00\n본론 5분 30초\n마무리 1:30" }, "")
   plan.value = raw.plan
-  const script = scriptInput(raw)
+  const script = createScriptInput({ text: raw.script, fileName: raw.scriptName, onBusy: (busy) => (form.querySelector("#btn-start").disabled = busy) })
 
   const form = h(
     "form",
@@ -135,7 +136,6 @@ function renderSetup() {
     errors,
     h("button", { type: "submit", class: "primary", id: "btn-start" }, "연습 시작"),
   )
-  script.onBusy = (busy) => (form.querySelector("#btn-start").disabled = busy)
 
   form.addEventListener("submit", (ev) => {
     ev.preventDefault()
@@ -162,100 +162,6 @@ function renderSetup() {
     h("p", { class: "lead" }, "목표 시간을 정하고 연습하면, 연습 중에는 남은 시간과 속도를 보여 주고 끝난 뒤에는 다시 들어 볼 구간을 표시해 줘요."),
     h("div", { class: "card", "aria-label": "연습 설정" }, form),
   )
-}
-
-/**
- * 대본 입력: TXT 파일 선택 또는 직접 붙여넣기. 어느 쪽이든 아래 입력란의 내용이 연습에 쓰인다.
- * 파일 선택을 취소하거나 읽기에 실패하면 입력란을 건드리지 않는다.
- */
-function scriptInput(raw) {
-  let fileName = raw.scriptName || ""
-  let loadedText = raw.script || ""
-  let reading = false
-  const area = h("textarea", { id: "f-script", rows: "8", placeholder: "대본을 직접 붙여 넣거나, 위에서 TXT 파일을 골라 불러온 뒤 고쳐 쓸 수 있어요." })
-  area.value = raw.script || ""
-  const file = h("input", { id: "f-script-file", type: "file", accept: ".txt,text/plain", "aria-describedby": "script-file-hint" })
-  const fileInfo = h("p", { class: "hint", id: "script-file-name", "data-testid": "script-file-name" })
-  const status = h("p", { class: "hint", role: "status", id: "script-status", "data-testid": "script-status" })
-  const error = h("div", { class: "errors", role: "alert", id: "script-error", "data-testid": "script-error", hidden: true })
-  const confirmBox = h("div", { class: "notice", id: "script-confirm", hidden: true })
-  const count = h("p", { class: "hint", id: "script-count" })
-
-  const refresh = () => {
-    if (!fileName) fileInfo.textContent = "불러온 파일 없음 (직접 입력한 대본은 그대로 써요)"
-    else fileInfo.textContent = `불러온 파일: ${fileName}${area.value !== loadedText ? " (불러온 뒤 수정함)" : ""}`
-    count.textContent = area.value.trim() ? `${area.value.length.toLocaleString("ko-KR")}자 · 연습 화면에 이 내용이 그대로 보여요.` : "대본 없이도 연습할 수 있어요."
-  }
-  const setBusy = (busy) => {
-    reading = busy
-    file.disabled = busy
-    api.onBusy?.(busy)
-  }
-  const showError = (msg) => {
-    error.replaceChildren(h("strong", null, "대본 파일을 불러오지 못했어요."), " ", msg, " 입력란의 기존 대본은 그대로 두었어요.")
-    error.hidden = false
-  }
-  const apply = (name, text) => {
-    area.value = text
-    fileName = name
-    loadedText = text
-    confirmBox.hidden = true
-    status.textContent = `'${name}' 내용을 입력란에 넣었어요. 확인하고 고쳐 쓸 수 있어요.`
-    refresh()
-  }
-
-  file.addEventListener("change", async () => {
-    const f = file.files?.[0]
-    if (!f || reading) return // 선택 창을 취소하면 아무것도 바꾸지 않는다
-    error.hidden = true
-    confirmBox.hidden = true
-    setBusy(true)
-    status.textContent = `'${f.name}' 파일을 읽는 중이에요…`
-    const r = await readScriptFile(f)
-    setBusy(false)
-    file.value = "" // 같은 파일을 다시 골라도 change가 오도록 비운다
-    if (!r.ok) {
-      status.textContent = ""
-      return showError(r.message)
-    }
-    if (!area.value.trim() || area.value === r.text) return apply(f.name, r.text)
-    status.textContent = ""
-    confirmBox.replaceChildren(
-      h("p", null, `입력란에 이미 대본이 있어요. '${f.name}' 내용으로 바꿀까요? 바꾸면 지금 입력란의 내용은 사라져요.`),
-      h(
-        "div",
-        { class: "btn-row" },
-        h("button", { type: "button", id: "btn-script-replace", onclick: () => apply(f.name, r.text) }, "파일 내용으로 바꾸기"),
-        h("button", { type: "button", id: "btn-script-keep", onclick: () => { confirmBox.hidden = true; status.textContent = "기존 대본을 그대로 두었어요." } }, "지금 대본 유지"),
-      ),
-    )
-    confirmBox.hidden = false
-  })
-  area.addEventListener("input", refresh)
-  refresh()
-
-  const fieldset = h(
-    "fieldset",
-    null,
-    h("legend", null, "발표 대본 (선택)"),
-    h("div", { class: "field" }, h("label", { for: "f-script-file" }, "TXT 파일 선택"), file),
-    h("p", { class: "hint", id: "script-file-hint" }, "UTF-8로 저장된 1MB 이하 .txt 파일을 불러와요. 파일은 이 브라우저 안에서만 읽고 서버로 보내지 않아요."),
-    fileInfo,
-    status,
-    error,
-    confirmBox,
-    h("label", { for: "f-script" }, "대본 내용 (직접 붙여넣기·수정)"),
-    area,
-    count,
-  )
-  const api = {
-    fieldset,
-    onBusy: null,
-    busy: () => reading,
-    text: () => area.value,
-    fileName: () => (area.value.trim() ? fileName : ""),
-  }
-  return api
 }
 
 function readSettings(raw) {
@@ -435,9 +341,7 @@ function renderPractice(p) {
     preview.muted = true
     preview.srcObject = p.capture.stream
   }
-  // 대본은 연습 시작 때 저장한 내용을 일반 글자로만 보여 준다(자동 스크롤 없음).
-  const scriptView = s.script ? scriptBlock(s.script, "script-view") : null
-  const stage = preview || scriptView ? h("div", { class: "stage", "data-video": preview ? "on" : "off", "data-script": scriptView ? "on" : "off" }, preview, scriptView) : null
+  const stage = practiceStage(preview, s.script)
 
   function update() {
     const el = Math.floor(p.elapsed()) // 화면·결과·구간 비교 모두 같은 '정수 초'로 계산한다
@@ -685,16 +589,6 @@ async function renderResult(session) {
       )
     : null
 
-  const usedScript = sessionScript(session)
-  const scriptCard = h(
-    "section",
-    { class: "card", "aria-label": "이 연습의 대본" },
-    h("h2", null, "이 연습에 쓴 대본"),
-    usedScript
-      ? h("details", null, h("summary", null, `대본 보기${usedScript.fileName ? ` (불러온 파일: ${usedScript.fileName})` : ""} · 연습 시작 때 내용 그대로예요`), scriptBlock(usedScript, "result-script"))
-      : h("p", { class: "hint", "data-testid": "no-script" }, "대본 없이 한 연습이에요."),
-  )
-
   const compareHost = h("section", { class: "card", "aria-label": "이전 연습과 비교" }, h("h2", null, "같은 조건의 이전 연습과 비교"), h("p", { class: "hint" }, "이전 기록을 찾는 중이에요…"))
 
   show(
@@ -704,12 +598,12 @@ async function renderResult(session) {
     sectionCard,
     review,
     transcriptCard,
-    scriptCard,
+    scriptResultCard(session),
     compareHost,
     h(
       "div",
       { class: "btn-row" },
-      h("button", { type: "button", class: "primary", id: "btn-again", onclick: () => { state.prefill = prefillFrom(session); location.hash = "#/" } }, "같은 조건으로 다시 연습"),
+      h("button", { type: "button", class: "primary", id: "btn-again", onclick: () => { state.prefill = { ...session.settings.raw, ...scriptPrefill(session) }; location.hash = "#/" } }, "같은 조건으로 다시 연습"),
       h("a", { href: "#/history" }, "연습 기록 보기"),
     ),
   )
@@ -731,22 +625,6 @@ async function renderResult(session) {
       ),
     )
   }
-}
-
-/** '같은 조건으로 다시 연습'에 채울 값. 대본 기능 이전 기록은 대본 없이 채운다. */
-function prefillFrom(session) {
-  const script = sessionScript(session)
-  return { ...session.settings.raw, script: script?.text || "", scriptName: script?.fileName || "" }
-}
-
-/** 대본을 줄바꿈을 살린 일반 글자로 보여 주는 영역. 길면 영역 안에서 스크롤한다. */
-function scriptBlock(script, testid) {
-  return h(
-    "section",
-    { class: "script-view", "aria-label": "발표 대본" },
-    h("h2", null, "발표 대본"),
-    h("div", { class: "script-text", tabindex: "0", "data-testid": testid}, script.text),
-  )
 }
 
 /** MediaRecorder가 만든 webm은 길이 정보가 없어 이동이 안 되는 경우가 있어서, 끝까지 한 번 이동해 길이를 알아낸다. */
