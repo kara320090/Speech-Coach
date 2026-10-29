@@ -27,7 +27,7 @@ canvas:
       why_ours: null
 personas:
   - id: P1
-    description: 10분 이내에 발표를 마쳐야 하는 대학생. 발표할 때 긴장하며, 내용을 전달하면서 말하기 속도와 시간을 함께 관리하기 어렵다.
+    description: 10분 이상 11분 미만으로 발표를 마쳐야 하는 대학생. 발표할 때 긴장하며, 내용을 전달하면서 말하기 속도와 시간을 함께 관리하기 어렵다.
     source: null
 experiences:
   - id: E1
