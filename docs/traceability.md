@@ -1,5 +1,9 @@
 # 요구사항 추적표
 
+## 2026-10-30 AI 처리 역할
+
+새 대본 생성(F22)은 `/create-script.html`·`POST /api/scripts/generate`에서 Gemini 3.8 Flash로 처리한다. 사용자가 입력한 주제·근거 자료만 전송하며, 초안 확인 후 기존 기록을 보존한 새 버전으로 저장한다. 기존 대본의 개념 분석·쉬운 표현 수정·질문·답변 검토는 Qwen, 음성 전사는 faster-whisper로 처리한다. 자체 AI와 Gemini의 상태·실패는 독립적이며 자동 공급자 대체는 없다. API·설정은 [역할 분리 명세](gemini-coach.md)를 따른다.
+
 ## 2026-10-30 main 통합 상태
 
 main의 다시봄 화면, TXT 불러오기, 구간 질문·조건 선택·재연습(S9), E2와 공개 조사 기록을 보존했다. 자체 AI 대본 코칭과 선택 전사, 영상 눈 깜빡임을 함께 제공한다. main의 F15는 대본 이해 교차 확인으로 유지하고, PR #3의 눈 깜빡임은 F21로 변경했다. 기존 문서의 미구현 표시는 당시 기록이며, 현재 상태는 이 절과 구현 범위 문서를 따른다. F13–F14 기본 흐름은 구현됐지만 전체 계획 수용 조건이 검증됐다는 뜻은 아니다.
@@ -62,3 +66,11 @@ F21–F16의 FR/AC·측정 규칙·저장 구조는 [측정 명세](media-measur
 | F20·F16 | B8 | FR-20 / AC-20 / NFR-11 | UI-COACH·UI-IMPORT | T20·T16 | 자체 LLM·전사 구현, 공개 운영·사람 음성 품질 미검증 |
 
 위 표가 새 자체 AI 방향의 현재 상태이며 기존 R1–R3 행은 원래 목표 배치다. 현재 상세 갭은 [구현 범위](local-ai-implementation.md), 실행은 [local-ai/README](../local-ai/README.md). 주최 측 S1–S4와 YAML은 유지한다.
+
+## F22 추적
+
+| 기능 | 요구·완료 조건 | 화면 | 코드·검사 | 범위 |
+| --- | --- | --- | --- | --- |
+| F22 | FR-22 / AC-22 | UI-CREATE NC4 | script-generation.js·create-script-page.js·gemini-coach.test.mjs·coach-provider.spec.ts | 새 대본 생성·확인·원본 보존·자체 코칭 이동 |
+
+F17–F20·F16은 자체 모델로 처리하며, F22만 외부 Gemini를 사용한다. 주최 측 S1–S4·S9와 scenarios.yaml의 흐름은 유지한다.

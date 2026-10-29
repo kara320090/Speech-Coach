@@ -1,4 +1,4 @@
-// Node 22 web server. /api/coach uses the provider chosen by AI_PROVIDER: local (default, loopback-only self-hosted model) or gemini (Google Gemini API).
+// Node 22: coaching/transcription use self-hosted models; only new script generation uses Gemini.
 import http from "node:http"
 import fs from "node:fs/promises"
 import { readFileSync } from "node:fs"
@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createScriptImportHandler } from "./server/script-import.js"
 
 import { CoachError, LIMITS } from "./server/local-coach.js"
-import { createCoach } from "./server/coach-provider.js"
+import { createCoach, createScriptGenerator } from "./server/coach-provider.js"
 import { createLocalTranscriber } from "./server/local-transcribe.js"
 import { createAgentBroker } from "./server/agent-broker.js"
 
@@ -62,8 +62,8 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
   const broker = agentMode ? createAgentBroker(agentPublicKey || JSON.parse(readFileSync(new URL("./server/agent-public-key.json", import.meta.url), "utf8")).publicKey) : null
   const inferenceEnv = broker ? { ...env, AI_PROVIDER: "local", LOCAL_LLM_URL: "http://127.0.0.1:8088", LOCAL_STT_URL: "http://127.0.0.1:8081", LOCAL_MODEL_NAME: "speech-coach" } : env
   const inferenceFetch = broker ? broker.fetch : fetchImpl
-  const geminiSelected = String(env.AI_PROVIDER || "local").trim().toLowerCase() === "gemini"
-  const coach = createCoach({ env: geminiSelected ? env : inferenceEnv, fetchImpl: geminiSelected ? fetchImpl : inferenceFetch })
+  const coach = createCoach({ env: inferenceEnv, fetchImpl: inferenceFetch })
+  const generator = createScriptGenerator({ env, fetchImpl })
   const transcriber = createLocalTranscriber({ env: inferenceEnv, fetchImpl: inferenceFetch })
   const frontendOrigins = new Set(["https://speech-coach-public.vercel.app", ...(env.FRONTEND_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean)])
   const importScript = createScriptImportHandler({ sendJson, ...(importLimits && { limits: importLimits }) })
@@ -78,6 +78,10 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         const managed = runtime?.snapshot() || broker?.snapshot()
         return sendJson(res, 200, { ...await coach.status(), transcriptionConfigured: transcriber.configured, ...(managed && { runtime: managed }) })
       }
+      if (pathname === "/api/scripts/generation-status") {
+        if (req.method !== "GET") return sendJson(res, 405, { error: "method" })
+        return sendJson(res, 200, await generator.status())
+      }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" })
       if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host && !frontendOrigins.has(req.headers.origin)) return sendJson(res, 403, { error: "origin", message: "이 페이지에서 시작한 요청만 처리할 수 있어요." })
       if (pathname === "/api/transcribe") {
@@ -91,7 +95,8 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
       if (!body) return sendJson(res, 413, { error: "too-large", message: "입력이 너무 커요. 짧은 구간으로 나누어 주세요." })
       let data
       try { data = JSON.parse(body.toString("utf8")) } catch { return sendJson(res, 400, { error: "invalid-json", message: "요청을 읽지 못했어요." }) }
-      const result = await coach.run(data, controller.signal, { client: clientId(req) })
+      const service = pathname === "/api/scripts/generate" ? generator : coach
+      const result = await service.run(data, controller.signal, { client: clientId(req) })
       if (!res.destroyed) sendJson(res, 200, result)
     } catch (e) {
       if (e?.retryAfter && !res.headersSent) res.setHeader("Retry-After", String(e.retryAfter))
@@ -106,7 +111,7 @@ export function createServer({ releaseId = process.env.RELEASE_ID || "dev", env 
         if (!broker) return sendJson(res, 404, { error: "not-found" })
         return await broker.handle(req, res, url.pathname)
       }
-      if (["/api/transcribe", "/api/coach", "/api/model-status"].includes(url.pathname)) return await api(req, res, url.pathname)
+      if (["/api/transcribe", "/api/coach", "/api/model-status", "/api/scripts/generate", "/api/scripts/generation-status"].includes(url.pathname)) return await api(req, res, url.pathname)
       if (url.pathname === "/api/scripts/import") {
         if (req.method !== "POST") {
           res.writeHead(405, { Allow: "POST", ...HEADERS })

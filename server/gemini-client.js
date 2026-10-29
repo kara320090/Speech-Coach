@@ -4,7 +4,7 @@
 import { CoachError, LIMITS, boundedJson } from "./local-coach.js"
 
 export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 export const MAX_OUTPUT_TOKENS = 2048
 
 const KEEP = "원문은 그대로 보존돼요."
@@ -90,7 +90,8 @@ export function createGeminiClient({ apiKey, model = DEFAULT_GEMINI_MODEL, timeo
               maxOutputTokens: MAX_OUTPUT_TOKENS,
               responseMimeType: "application/json",
               responseJsonSchema: schema,
-              thinkingConfig: { thinkingBudget: 0 }, // 생각 토큰을 쓰지 않아 지연·사용량을 줄인다
+              // 3.x uses thinking levels; 2.5 keeps its legacy budget setting when explicitly selected.
+              thinkingConfig: /^gemini-3\./.test(model) ? { thinkingLevel: "low" } : { thinkingBudget: 0 },
             },
           }),
           signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),

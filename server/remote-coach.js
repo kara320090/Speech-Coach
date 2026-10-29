@@ -46,7 +46,7 @@ const rateLimited = (retryAfter, scope) =>
  * client: { provider, model, generateJson({ system, user, schema, temperature, signal }) → { raw, usage } }
  * info: { processing, processingNotice, keyConfigured, configError }
  */
-export function createRemoteCoach({ client, info, limits = remoteLimits(), now = () => Date.now() }) {
+export function createRemoteCoach({ client, info, limits = remoteLimits(), now = () => Date.now(), spec = { validateInput, buildMessages, outputSchema, validateOutput }, promptVersion = PROMPT_VERSION }) {
   const minute = windowCounter(60_000)
   const day = windowCounter(86_400_000)
   const perClient = new Map()
@@ -58,7 +58,7 @@ export function createRemoteCoach({ client, info, limits = remoteLimits(), now =
   let lastFailure = null
 
   function status() {
-    const base = { provider: client?.provider || info.provider, model: client?.model || info.model, promptVersion: PROMPT_VERSION, processing: info.processing, processingNotice: info.processingNotice, keyConfigured: info.keyConfigured, connection, lastVerifiedAt }
+    const base = { provider: client?.provider || info.provider, model: client?.model || info.model, promptVersion, processing: info.processing, processingNotice: info.processingNotice, keyConfigured: info.keyConfigured, connection, lastVerifiedAt }
     if (info.configError) return { ...base, ready: false, reason: info.configError.reason, message: info.configError.message }
     if (connection === "failed") return { ...base, ready: false, reason: lastFailure, message: `마지막 요청에서 Gemini 설정 문제(${lastFailure})가 확인됐어요. 서버 설정을 고친 뒤 다시 배포해 주세요. 자료 저장·직접 수정은 계속할 수 있어요.` }
     const wait = Math.ceil((cooldownUntil - now()) / 1000)
@@ -85,13 +85,13 @@ export function createRemoteCoach({ client, info, limits = remoteLimits(), now =
   }
 
   async function call(input, signal) {
-    const [system, user] = buildMessages(input)
+    const [system, user] = spec.buildMessages(input)
     const start = now()
     try {
-      const { raw } = await client.generateJson({ system: system.content, user: user.content, schema: outputSchema(input), temperature: input.task === "review" ? 0 : 0.2, signal })
+      const { raw } = await client.generateJson({ system: system.content, user: user.content, schema: spec.outputSchema(input), temperature: input.task === "review" ? 0 : 0.2, signal })
       connection = "verified"
       lastVerifiedAt = new Date(now()).toISOString()
-      return { requestId: input.requestId, versionId: input.versionId, task: input.task, model: client.model, promptVersion: PROMPT_VERSION, durationMs: now() - start, result: validateOutput(raw, input) }
+      return { requestId: input.requestId, versionId: input.versionId, task: input.task, model: client.model, promptVersion, durationMs: now() - start, result: spec.validateOutput(raw, input) }
     } catch (e) {
       if (e instanceof CoachError) {
         if (["provider-auth", "provider-billing", "provider-model"].includes(e.code)) {
@@ -115,14 +115,15 @@ export function createRemoteCoach({ client, info, limits = remoteLimits(), now =
   return {
     status,
     async run(data, signal, meta = {}) {
-      const input = validateInput(data)
+      const input = spec.validateInput(data)
       if (input.task === "review" && !input.answer) throw new CoachError(400, "no-answer", "자기 설명을 입력하거나 설명받기·건너뛰기를 선택해 주세요.")
       // 근거 자료 없는 답변 검토는 모델을 부르지 않는다(자체 모델 방식과 같은 규칙).
       if (input.task === "review" && !input.sources) return { requestId: input.requestId, versionId: input.versionId, task: input.task, model: "rule:no-source", promptVersion: PROMPT_VERSION, durationMs: 0, result: { state: "uncertain", supported: "", answerQuote: "", sourceQuote: "", nextStep: "답변을 확인할 근거 자료가 아직 없어요. 원자료를 붙여 넣으면 그 내용과 함께 살펴볼 수 있어요.", humanReview: "unreviewed", evidenceStatus: "no-source-material" } }
       if (info.configError) throw new CoachError(503, info.configError.reason, info.configError.message)
       if (connection === "failed") throw new CoachError(503, lastFailure, `Gemini 설정 문제(${lastFailure})가 확인돼 요청을 보내지 않았어요. 서버 설정을 고친 뒤 다시 배포해 주세요. ${KEEP}`)
       // 같은 요청 ID나 같은 내용의 요청이 처리 중이면 새로 호출하지 않고 그 결과를 함께 쓴다.
-      const fingerprint = createHash("sha256").update(JSON.stringify([input.task, input.versionId, input.script, input.sources, input.question, input.answer])).digest("hex")
+      const { requestId: _requestId, ...content } = input
+      const fingerprint = createHash("sha256").update(JSON.stringify(content)).digest("hex")
       const shared = inFlight.get(input.requestId) || inFlight.get(fingerprint)
       if (shared) return { ...(await shared), requestId: input.requestId, versionId: input.versionId }
       admit(meta.client)
