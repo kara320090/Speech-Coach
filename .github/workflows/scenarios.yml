@@ -1,13 +1,15 @@
 # 루프톤 시나리오 검사. 주최 측 실행과 같은 순서로 docker compose 기동 → /__health 대기 → Playwright 실행.
 # .github/workflows/scenarios.yml로 복사한다. compose 기동·/__health 응답·시나리오 E2E를 검사한다.
 # 주최 측 실행은 e2e/playwright.config.ts 대신 같은 화면 크기·순서의 자체 설정으로 돈다. 여기서 통과하는지로 주최 측 실행 실행을 미리 확인한다.
-# 모델 없이도 기존 흐름을 검증한다. 자체 모델 품질 검사는 별도이며 외부 AI 키는 사용하지 않는다.
+# 채점 흐름은 실제 Gateway 키를 사용한다. 녹화 입력 재생 검사는 별도 미디어 spec으로 실행한다.
 # 기본 브랜치 push와 수동 실행(Actions 탭 → Run workflow)에서 실행한다.
 # spec이 하나도 없으면 E2E 단계는 비어 있는 채로 통과하니(--pass-with-no-tests), spec을 넣은 뒤의 결과를 본다.
 name: scenarios
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -17,8 +19,15 @@ jobs:
     timeout-minutes: 25
     env:
       E2E_BASE_URL: http://localhost:3000
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
     steps:
       - uses: actions/checkout@v7
+      - name: Require server AI Gateway key
+        run: |
+          if [ -z "$AI_GATEWAY_API_KEY" ]; then
+            echo "Set the repository secret AI_GATEWAY_API_KEY to verify real AI scenarios."
+            exit 1
+          fi
       - name: Start app and database
         run: RELEASE_ID="$GITHUB_SHA" docker compose up -d --build
       - name: Wait for /__health
@@ -49,7 +58,25 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
-          npx playwright test --pass-with-no-tests --forbid-only
+          npx playwright test --forbid-only
+      - name: Prepare replay capture tools
+        run: |
+          if ! command -v ffmpeg > /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Record actual clip input with real Gateway responses (not a grading scenario)
+        working-directory: e2e
+        env:
+          RECORDING_DEMO_PACE_MS: 1500
+        run: npx playwright test -c media.config.ts S7-real-recording.spec.ts
+      - name: Upload scenario and recording evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-evidence
+          path: e2e/test-results/
+          if-no-files-found: ignore
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
