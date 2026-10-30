@@ -68,7 +68,9 @@ scenarios:
 - id: S6
   title: 실제 발표 영상 파일의 소리와 눈 깜빡임을 이 기기에서 분석한다
   steps:
-  - "/import.html에서 '영상 또는 소리 파일'에 e2e/fixtures/presentation-review.mp4를 선택한다"
+  - "첫 화면에서 '바로 서비스 이용하기'를 누른다"
+  - "주 메뉴의 '영상 불러오기'를 누른다"
+  - "'영상 또는 소리 파일'에 e2e/fixtures/presentation-review.mp4를 선택한다"
   - "목표 시간 초에 18을 입력한다"
   - "글자 변환은 끈 상태로 '영상 눈 깜빡임도 이 기기에서 분석'을 켠다"
   - "'분석 시작'을 누르고 완료를 기다린다"
