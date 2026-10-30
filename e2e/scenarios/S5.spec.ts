@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test'
+test.setTimeout(60_000)
 const SCRIPT='캐시는 최근 결과를 5분 동안 저장해 같은 요청에 다시 사용합니다.\n\n효과는 아직 검증하지 않았습니다.'
 
 test('S5 확인한 대본 위치에서 대화하고 수정안을 확인·적용한 뒤 다시 연습한다',async({page})=>{
@@ -24,12 +25,11 @@ test('S5 확인한 대본 위치에서 대화하고 수정안을 확인·적용�
  await page.getByRole('button',{name:'보내기',exact:true}).click()
  await expect(page.getByText('대화 요약',{exact:true})).toBeVisible()
  const revise=page.getByRole('button',{name:'이 문단 고치기',exact:true})
- if(process.env.STUDIO_EXPECT_READY==='1')await expect(revise).toBeEnabled()
- if(await revise.isDisabled()){await expect(page.getByText(/AI 미설정: 풀이/)).toBeVisible();expect(errors).toEqual([]);expect(transcriptions).toBe(0);return}
- const responsePromise=page.waitForResponse(r=>r.url().endsWith('/api/scripts/revise-segment')&&r.request().method()==='POST',{timeout:115000})
+ await expect(revise).toBeEnabled()
+ const responsePromise=page.waitForResponse(r=>r.url().endsWith('/api/scripts/revise-segment')&&r.request().method()==='POST',{timeout:45000})
  await revise.click()
  const response=await responsePromise;expect(response.ok(), 'revision HTTP status '+response.status()).toBe(true)
- await expect(page.getByText('수정안이 준비됐어요',{exact:true})).toBeVisible({timeout:115000})
+ await expect(page.getByText('수정안이 준비됐어요',{exact:true})).toBeVisible({timeout:45000})
  await expect(page.getByRole('button',{name:'수정안 적용하기'})).toBeDisabled()
  await page.getByRole('checkbox',{name:/수치·조건·부정 표현과 원래 뜻/}).check()
  await page.getByRole('button',{name:'수정안 적용하기',exact:true}).click()

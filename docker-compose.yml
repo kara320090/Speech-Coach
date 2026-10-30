@@ -13,6 +13,8 @@ services:
       TRANSCRIBE_TOTAL_SECONDS: ${TRANSCRIBE_TOTAL_SECONDS:-3600}
       # 채점기는 Gateway 키만 주입한다. 키가 없어도 앱은 뜨며 AI 미설정 상태를 안내한다.
       AI_PROVIDER: ${AI_PROVIDER:-gateway}
+      # S5 + S8 use at most five text calls in one run; keep bounded per-client capacity.
+      AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE: ${AI_MAX_REQUESTS_PER_CLIENT_PER_MINUTE:-6}
       # 주최 측 Vercel AI Gateway(AI_PROVIDER=gateway일 때 코칭·대화·수정·새 대본·전사 모두 사용). 키는 환경변수로만 받는다.
       AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
       AI_GATEWAY_TEXT_MODEL: ${AI_GATEWAY_TEXT_MODEL:-google/gemini-3.8-flash}
