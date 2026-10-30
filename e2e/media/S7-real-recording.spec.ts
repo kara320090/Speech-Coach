@@ -71,6 +71,7 @@ test("녹화 입력 재생과 실제 AI로 녹화·전사·코칭·수정·재�
   windows.push(retryWindow)
   await page.getByRole("button", { name: "구간 연습 종료", exact: true }).click()
   await expect(page.getByTestId("practice-compare")).toBeVisible({ timeout: 60000 })
+  await expect(page.getByRole("button", { name: "새 연습 준비하기", exact: true })).toBeEnabled({ timeout: 60000 })
   await page.getByRole("button", { name: "두 영상 함께 재생", exact: true }).click()
   await expect.poll(() => page.locator(".attempt-card video").evaluateAll(v => v.length === 2 && v.every(e => (e as HTMLVideoElement).readyState >= 2 && (e as HTMLVideoElement).currentTime < 30))).toBe(true)
   await checkpoint("05-동일한-녹화입력의-재연습-비교")
