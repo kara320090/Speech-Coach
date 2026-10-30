@@ -63,6 +63,7 @@ test("녹화 입력 재생과 실제 AI로 녹화·전사·코칭·수정·재�
   await checkpoint("04-실제-Gateway-수정안")
   await page.getByRole("checkbox", { name: /수치·조건·부정 표현과 원래 뜻/ }).check()
   await page.getByRole("button", { name: "수정안 적용하기", exact: true }).click()
+  await page.getByRole("checkbox", { name: /녹음 소리를 AI로 전사하는 데 동의해요/ }).check()
   await page.getByRole("button", { name: "구간 녹화 시작", exact: true }).click()
   const retryWindow = { startMs: Date.now() - started, endMs: 0 }
   await page.waitForTimeout(18000)
@@ -94,6 +95,7 @@ test("녹화 입력 재생과 실제 AI로 녹화·전사·코칭·수정·재�
   records.forEach((r, i) => {
     expect(r.audioBytes).toBeGreaterThan(44)
     expect(r.videoBytes).toBeGreaterThan(0)
+    expect(r.processing.status).toBe("ok")
     fs.writeFileSync(info.outputPath(`app-recording-${i + 1}.wav`), Buffer.from(r.audioBase64, "base64"))
     delete r.audioBase64
   })

@@ -22,6 +22,11 @@ jobs:
       AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
     steps:
       - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Validate submission scenario YAML
+        run: ruby scripts/validate_scenarios.rb
       - name: Require server AI Gateway key
         run: |
           if [ -z "$AI_GATEWAY_API_KEY" ]; then
