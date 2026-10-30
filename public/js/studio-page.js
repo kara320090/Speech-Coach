@@ -1371,7 +1371,7 @@ function revisionScreen() {
           h("p", { text: warnings.length ? warnings.join(" · ") : p.note || "수치·단위·부정·조건 표현이 유지됐어요. 의미가 같다고 보장하지는 않아요." })),
       ),
     ),
-    h("label", { class: "studio-consent" }, h("input", { type: "checkbox", checked: Boolean(r.meaningConfirmed), onchange: (e) => { r.meaningConfirmed = e.target.checked; render() } }), "수치·조건·부정 표현과 원래 뜻을 직접 확인했어요."),
+    h("label", { class: "studio-consent" }, h("input", { type: "checkbox", checked: Boolean(r.meaningConfirmed), onchange: (e) => { r.meaningConfirmed = e.target.checked; render() } }), "의미 보존 확인: 수치·조건·부정 표현과 원래 뜻을 직접 확인했어요."),
     d.basis?.unverified?.length ? h("p", { class: "align-reason", text: `설명 정확성은 확인되지 않았어요: ${d.basis.unverified.join(" ")}` }) : null,
     r.error && h("p", { class: "coach-error", role: "alert", text: r.error }),
     h("div", { class: "screen-actions" },
