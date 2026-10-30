@@ -11,7 +11,6 @@ export default defineConfig({
   testMatch: /[\\/]S[1-9]\d*\.spec\.ts$/,
   workers: 1,
   retries: 0,
-  outputDir: "./test-results/scenarios",
   timeout: 120_000,
   expect: { timeout: 10_000 },
   reporter: [["list"], ["html", { open: "never" }]],
@@ -21,7 +20,6 @@ export default defineConfig({
     timezoneId: "Asia/Seoul",
     serviceWorkers: "block",
     trace: "retain-on-failure",
-    video: { mode: "on", size: { width: 1440, height: 900 } },
   },
   projects: [{ name: "desktop", use: { viewport: { width: 1440, height: 900 } } }],
 })

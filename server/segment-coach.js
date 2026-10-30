@@ -27,7 +27,7 @@ const ID = /^[\w.:-]{1,80}$/
 const REQ = /^[\w-]{1,80}$/
 const REASONS = ["intended-pause", "forgot-line", "concept-confusing", "awkward-sentence", "other"]
 const ACTIONS = ["start", "answer", "unknown", "explain", "skip"]
-const OBSERVATIONS = { manual: "직접 고른 검토 시점", silence: "긴 침묵", repeat: "반복 표현", filler: "군말", gaze: "시선 이탈", speed: "속도 변화", section: "구간 시간 차이" }
+const OBSERVATIONS = { silence: "긴 침묵", repeat: "반복 표현", filler: "군말", gaze: "시선 이탈", speed: "속도 변화", section: "구간 시간 차이" }
 const CONFIRMATIONS = ["user-confirmed", "user-selected"]
 
 const err = (status, code, message) => new CoachError(status, code, message)
@@ -214,7 +214,7 @@ export function createSegmentCoach({ coach, now = () => Date.now(), limits = SEG
         next = {
           step: "ask-situation",
           done: false,
-          message: msg("situation", "question", `${point.observations.every(o => o.type === "manual") ? `${where}은 사용자가 직접 고른 검토 시점이에요. 자동으로 감지한 이상 구간이라는 뜻은 아니에요.` : `${where}에 ${observed}이(가) 관찰됐어요.`} 사용자가 확인한 위치는 대본 “${clip(selection.text)}” 근처예요. 이 부분에서 어떤 일이 있었나요?`, [
+          message: msg("situation", "question", `${where}에 ${observed}이(가) 관찰됐어요. 사용자가 확인한 위치는 대본 “${clip(selection.text)}” 근처예요. 이 부분에서 어떤 일이 있었나요?`, [
             { value: "intended-pause", label: "일부러 쉬었어요" },
             { value: "forgot-line", label: "다음 대사가 기억나지 않았어요" },
             { value: "concept-confusing", label: "내용(개념)이 헷갈렸어요" },
@@ -280,7 +280,7 @@ export function createSegmentCoach({ coach, now = () => Date.now(), limits = SEG
         followupCount,
         followupLimit: FOLLOWUP_LIMIT,
         summary: {
-          observations: point.observations.map((o) => ({ type: o.type, label: o.label, measured: o.measured || null, startSecond: point.startSecond, endSecond: point.endSecond, source: o.type === "manual" ? "user-selected" : "measurement" })),
+          observations: point.observations.map((o) => ({ type: o.type, label: o.label, measured: o.measured || null, startSecond: point.startSecond, endSecond: point.endSecond, source: "measurement" })),
           location: { ...selection, source: "client-confirmed", note: "사용자가 확인·선택한 위치예요(서버 검증 사실 아님)." },
           userReports: reason ? [{ questionKey: "situation", reason, source: "user" }, ...userReports.filter((u) => u.questionKey !== "situation" || u.text)] : userReports,
           evidence,

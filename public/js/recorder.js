@@ -55,7 +55,7 @@ export class MediaCapture {
    * 권한을 요청한다. 실패해도 예외를 던지지 않고 notices에 이유를 담아 돌려준다.
    * 반환: { capture: MediaCapture | null, notices: string[], status: { audio, video } }
    */
-  static async open({ audio, video, timeoutMs = 20000, audioDeviceId = "", videoDeviceId = "" }) {
+  static async open({ audio, video, timeoutMs = 20000 }) {
     const notices = []
     const status = { audio: "off", video: "off" }
     if (!audio && !video) return { capture: null, notices, status }
@@ -67,17 +67,14 @@ export class MediaCapture {
     }
     let stream = null
     const ask = (c) => withTimeout(navigator.mediaDevices.getUserMedia(c), timeoutMs)
-    // 장치 ID는 '선호'로만 준다(exact가 아니라서 장치가 빠져도 기본 장치로 열린다).
-    const audioC = audioDeviceId ? { ...AUDIO_CONSTRAINTS, deviceId: audioDeviceId } : AUDIO_CONSTRAINTS
-    const videoC = { width: 640, height: 360, ...(videoDeviceId && { deviceId: videoDeviceId }) }
     try {
-      stream = await ask({ audio: audioC, video: video ? videoC : false })
+      stream = await ask({ audio: AUDIO_CONSTRAINTS, video: video ? { width: 640, height: 360 } : false })
       status.audio = "ok"
       if (video) status.video = "ok"
     } catch (e) {
       if (video) {
         try {
-          stream = await ask({ audio: audioC })
+          stream = await ask({ audio: AUDIO_CONSTRAINTS })
           status.audio = "ok"
           status.video = "failed"
           notices.push(`웹캠을 쓸 수 없어 소리만 기록해요 (${describeMediaError(e)}).`)

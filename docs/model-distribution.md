@@ -1,6 +1,4 @@
-# GitHub 모델 배포와 별도 자체 실행
-
-기본 채점 Docker는 경량 Node 서버와 실제 Gateway를 사용한다. 아래 대형 모델 이미지는 별도 운영·검사용이며 기본 `docker compose up` 경로와 구분한다.
+# GitHub 모델 배포와 평가용 자체 실행
 
 실제 모델 가중치: [model-weights-v1 GitHub Release](https://github.com/kara320090/Speech-Coach/releases/tag/model-weights-v1).
 
@@ -23,23 +21,22 @@ node local-ai/restore-models.mjs --from .model-download --dir models
 
 복원기는 각 파일·전체 모델 해시를 검사하고, 다른 내용의 기존 모델을 덮어쓰지 않는다. 기존 PC 실행 안내의 모델 폴더에 복원한 경로를 지정하면 된다.
 
-## 별도 자체 모델 Docker
+## 평가용 Docker
 
 ```sh
-docker build -f Dockerfile.selfhosted -t speech-coach-selfhosted .
-docker run --rm -p 3000:3000 speech-coach-selfhosted
+docker compose up --build
 ```
 
-이 별도 이미지는 Node·Qwen·faster-whisper를 함께 실행한다. GPU·운영 PC·에이전트·외부 AI 키 없이 CPU로 코칭과 전사를 수행한다. 두 추론 서버는 컨테이너 내부 loopback에서만 열고 외부에는 3000 포트만 제공한다. `GET /api/model-status`의 provider는 local, runtime.mode는 managed다.
+`app` 컨테이너가 Node·Qwen·faster-whisper를 함께 실행한다. GPU·운영 PC·에이전트·외부 AI 키 없이 CPU로 코칭과 전사를 수행한다. 두 추론 서버는 컨테이너 내부 loopback에서만 열고 외부에는 3000 포트만 제공한다. `GET /api/model-status`의 provider는 local, runtime.mode는 managed다.
 
 이미지 빌드 때 고정 revision과 SHA-256으로 원본 공개 저장소에서 동일 가중치를 받는다. private Release를 읽기 위한 토큰을 이미지나 채점 환경에 요구하지 않기 위한 경로다. 모델 파일은 완성된 이미지에 포함되고, 컨테이너 시작·실제 추론 중에는 모델을 다운로드하거나 외부 AI로 대체하지 않는다. 첫 빌드에는 인터넷과 약 2.65GB의 모델 다운로드, 이미지 저장 공간이 필요하다. 실행에는 모델과 작업 메모리를 확보해야 하며 CPU 속도에 따라 지연이 달라진다.
 
-공개 사이트는 서버에 설정한 공급자를 사용한다. local 운영 모드는 Vercel→Render→운영 PC 경로를 유지하며, gateway 모드는 서버 전용 Gateway 키로 처리한다. 기본 제출 흐름의 실제 AI 검사는 주최 측 키를 사용한다.
+공개 사이트의 Vercel→Render→운영 PC 경로는 유지한다. Render 무료 인스턴스에 이 대형 모델을 올리는 구성으로 바꾸지 않는다. 새 대본 생성만 선택적으로 Gemini를 사용하고, 평가 핵심 8개 시나리오는 그 키를 요구하지 않는다.
 
 ## 시나리오와 실제 검사
 
-현재 제출은 S1–S6·S8·S9의 8개이며 [추적표](traceability.md)를 따른다. S5·S8은 실제 Gateway 텍스트, S6는 실제 파일 음성 전사와 로컬 영상 분석을 검사한다. 자체 모델용 기존 S5–S7은 `e2e/selfhosted/`의 별도 검사로 보존한다.
+`docs/scenarios.yaml`의 S1–S4·S5–S7·기존 S9 총 8개를 각각 같은 ID의 `e2e/scenarios/*.spec.ts`로 검사한다. S5는 실제 자체 Qwen의 쉬운 대본·버전 복원, S6은 개념·답변 검토·이력 보존, S7은 저장소의 합성 한국어 음성 파일을 실제 자체 Whisper로 전사한다. 답변 가로채기·가짜 AI 응답·test.skip을 사용하지 않는다. 카메라·마이크가 없는 환경에서는 시간·구간 흐름이 그대로 끝나며 음성은 합성 파일로 검증한다.
 
-현재 GitHub Actions는 기본 경량 Docker와 실제 Gateway 제출 흐름을 검사하고, 제공된 촬영 파일을 가상 장치로 재생하는 별도 증빙을 보관한다. 모델 정확도·실제 카메라 성능·학습 효과는 별도 평가 범위다.
+GitHub Actions는 Docker 기동 후 실제 모델 준비·질문 생성·한국어 전사를 확인하고 8개 화면 흐름을 검사한다. 합성 음성과 자동 검사 결과는 사람의 발화·군말·얼굴 정확도나 학습 효과 검증과 구분한다.
 
-[과거 별도 자체 모델 Docker 실행 기록](https://github.com/kara320090/Speech-Coach/actions/runs/40928210822)은 당시 모델·웹 기동과 질문·전사·화면 흐름에 대한 기록이다. 현재 기본 평가 Docker의 결과와 구분한다.
+[실제 Docker CI](https://github.com/kara320090/Speech-Coach/actions/runs/40928210822)에서 모델·웹 기동, 자체 질문 생성·한국어 전사와 8개 화면 흐름을 모두 통과했다. 이미지 빌드 약 60초, 모델 기동 약 6초, 화면 검사 2.9분이었다.

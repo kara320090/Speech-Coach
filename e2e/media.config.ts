@@ -19,7 +19,6 @@ export default defineConfig({
   testMatch: /\.spec\.ts$/,
   workers: 1,
   retries: 0,
-  outputDir: "./test-results/media",
   timeout: 120_000,
   expect: { timeout: 15_000 },
   reporter: [["list"]],

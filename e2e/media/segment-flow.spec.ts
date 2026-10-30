@@ -15,7 +15,7 @@ async function seedSession(page: Page, { transcript = true, gateway = false } = 
   await page.route("**/api/model-status", route => route.fulfill({ json: gateway
     ? { provider: "ai-gateway", ready: true, model: "google/gemini-3.8-flash", processingNotice: "선택한 텍스트를 주최 측 Vercel AI Gateway를 거쳐 Google로 보내요." }
     : { provider: "local", ready: true, model: "speech-coach", processingNotice: "자체 모델로 처리해요." } }))
-  await page.goto("/#/")
+  await page.goto("/")
   await page.evaluate(({ SCRIPT, transcript }) => new Promise<void>((resolve, reject) => {
     const req = indexedDB.open("speech-coach", 1)
     req.onupgradeneeded = () => req.result.createObjectStore("sessions", { keyPath: "id" })

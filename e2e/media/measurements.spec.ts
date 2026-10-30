@@ -17,7 +17,7 @@ test("real vendored model loads under CSP and processes a blank frame (not face 
   const expectedOrigin = new URL(baseURL!).origin
   page.on("request", (r) => { if (/^https?:/.test(r.url()) && new URL(r.url()).origin !== expectedOrigin) external.push(r.url()) })
   page.on("console", (m) => { if (/violat.*Content Security Policy/i.test(m.text())) violations.push(m.text()) })
-  await page.goto("/#/")
+  await page.goto("/")
   const count = await page.evaluate(async () => {
     const { createBlinkDetector } = await import("/js/video-analysis.js")
     const detector = await createBlinkDetector()

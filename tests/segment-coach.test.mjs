@@ -389,16 +389,3 @@ test("공급자 오류: 모델 미설정·모델 오류·잘못된 출력은 기
 test("대본·답변·전사는 로그(console)에 남지 않는다", () => {
   for (const s of ["캐시", "도서관", "5분 동안 저장해요", "practice-7"]) assert.ok(!logged.some((l) => l.includes(s)), `로그에 '${s}'`)
 })
-
-test('직접 선택한 검토 시점은 측정 이상으로 단정하지 않는다', async()=>{
- const model=fakeModel()
- await withServer(model,async base=>{
-  const {req}=await alignedRequest(base)
-  req.point.observations=[{type:'manual',measured:'사용자가 직접 선택'}]
-  const response=await postJson(base,'/api/coach/segment',req),body=await response.json()
-  assert.equal(response.status,200)
-  assert.match(body.message.text,/자동으로 감지한 이상 구간이라는 뜻은 아니에요/)
-  assert.equal(body.summary.observations[0].source,'user-selected')
-  assert.equal(model.calls.length,0)
- })
-})

@@ -95,21 +95,22 @@ export async function transcribeChunks(samples, chunks, { fetchFn = fetch, concu
   let next = 0
   async function one(chunk) {
     const wav = new Blob([encodeWavBytes(samples.subarray(chunk.startIdx, chunk.endIdx), TARGET_RATE)], { type: "audio/wav" })
-    let res
-    try {
-      res = await fetchFn("/api/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav, signal })
-    } catch (e) {
-      if (signal?.aborted) throw e
-      return null // 유료 전사를 자동으로 다시 보내지 않는다.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res
+      try {
+        res = await fetchFn("/api/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav, signal })
+      } catch (e) {
+        if (signal?.aborted) throw e
+        continue
+      }
+      const body = await res.json().catch(() => ({}))
+      if (res.ok) return body
+      if (body.error === "not-configured") throw Object.assign(new Error(body.message), { fatal: "not-configured" })
+      if (res.status === 429) throw Object.assign(new Error(body.message || "사용 한도에 걸렸어요."), { fatal: "limit" })
+      if (body.error === "gateway-auth") throw Object.assign(new Error(body.message), { fatal: "error" })
     }
-    const body = await res.json().catch(() => ({}))
-    if (res.ok) return body
-    if (body.error === "not-configured") throw Object.assign(new Error(body.message), { fatal: "not-configured" })
-    if (res.status === 429) throw Object.assign(new Error(body.message || "사용 한도에 걸렸어요."), { fatal: "limit" })
-    if (["gateway-auth", "provider-auth", "provider-billing", "provider-model", "invalid-model"].includes(body.error)) throw Object.assign(new Error(body.message), { fatal: "error" })
     return null
   }
-
   async function worker() {
     while (!fatal) {
       const i = next++

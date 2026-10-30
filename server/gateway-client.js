@@ -68,28 +68,6 @@ export function parseGatewayResponse(body) {
   return { raw, usage: usageOf(body) }
 }
 
-/** Google transport schemas must not encode optional/no-source quotes as enum:[""].
- * Keep normal citation enums, and enforce all quote constraints again in validateModelOutput.
- * Work on a clone so local-model schemas and response validation stay unchanged.
- */
-export function gatewaySchema(schema, model) {
-  const copy = structuredClone(schema)
-  if (!model.startsWith("google/")) return copy
-  const visit = (node) => {
-    if (!node || typeof node !== "object") return
-    if (Array.isArray(node.enum) && node.enum.includes("")) {
-      if (node.enum.length === 1) node.description = 'No source material was supplied. Return the empty string "". Do not quote the script or surrounding context.'
-      delete node.enum
-    }
-    for (const value of Object.values(node)) {
-      if (Array.isArray(value)) value.forEach(visit)
-      else visit(value)
-    }
-  }
-  visit(copy)
-  return copy
-}
-
 /**
  * Gateway 텍스트 클라이언트. remote-coach.js가 쓰는 generateJson({ system, user, schema, temperature, signal }) 모양.
  * Gemini 3.x는 sampling 값을 바꾸지 않는 것이 권장이라 temperature를 보내지 않는다.
@@ -113,7 +91,7 @@ export function createGatewayClient({ apiKey, model = DEFAULT_GATEWAY_TEXT_MODEL
             stream: false,
             max_tokens: GATEWAY_MAX_TOKENS,
             ...(!defaultSampling && { temperature }),
-            response_format: { type: "json_schema", json_schema: { name: "result", schema: gatewaySchema(schema, model) } },
+            response_format: { type: "json_schema", json_schema: { name: "result", schema } },
             reasoning: { effort: "low", exclude: true }, // 생각은 낮게, 생각 글은 응답에서 뺀다
           }),
           signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),

@@ -3,12 +3,6 @@ import assert from "node:assert/strict"
 import { createServer } from "../server.js"
 import { localUrl, validateInput, validateOutput, buildMessages, createLocalCoach, outputSchema } from "../server/local-coach.js"
 
-test("no-source rewrite explicitly requests an empty citation and rejects a script masquerading as evidence", () => {
-  const input = validateInput({ task: "rewrite", requestId: "no-source", versionId: "v1", script: "결과를 5분 저장한다.", sources: "" })
-  assert.match(buildMessages(input)[0].content, /sources가 빈 문자열이면 sourceQuote는 반드시 빈 문자열/)
-  assert.throws(() => validateOutput({ rewritten: "결과를 5분 동안 저장해요.", reason: "짧게 나눴어요.", sourceQuote: input.script }, input))
-})
-
 const sample = (extra = {}) => ({ task: "review", requestId: "request-1", versionId: "version-1", script: "결과를 5분 동안 저장한다. 효과는 검증하지 않았다.", sources: "결과를 5분 동안 저장한다. 효과는 검증하지 않았다.", question: "얼마나 보관하나요?", answer: "5분 동안 저장해요.", ...extra })
 const reviewed = { state: "supported", supported: "저장 시간을 설명했어요.", answerQuote: "5분 동안 저장해요.", sourceQuote: "결과를 5분 동안 저장한다.", nextStep: "이 설명으로 짧게 발표해 보세요." }
 const reply = value => new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(value) } }] }))

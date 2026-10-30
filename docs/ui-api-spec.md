@@ -10,7 +10,6 @@
 | `/#/result/:id` | 저장된 연습 다시 보기(메인 화면에 결과만 채움) | 같음 |
 | `/#/history` | 연습 기록 목록 | 같음 |
 | `/import.html` | 영상·소리 파일 불러오기 | `public/import.html`, `public/js/import-page.js` |
-| `/studio.html` | 다시봄 스튜디오: 대본 준비 → 웹캠 연습 → 결과 분석 → AI 코칭 → 대본 수정 → 다시 연습(1.2절) | `public/studio.html`, `public/js/studio-page.js`, `public/studio.css` |
 
 스타일은 `public/nocturne.css`(디자인 시스템 토큰·공통 클래스)와 `public/styles.css`(화면 배치)다. 색·간격·모서리는 `var(--color-*)`, `var(--space-*)`, `var(--radius-*)` 변수만 쓴다. 시간 상태 경고색만 `--warn`(임박), `--over`(초과)를 따로 둔다.
 
@@ -30,21 +29,6 @@
 └──────────────────────────────────────────────────────────────────────┘
 * 조건부 표시
 ```
-
-### 1.2 다시봄 스튜디오(`/studio.html`)
-
-Figma Make 시안(dasibom-site, React)을 빌드 없이 쓰도록 ES 모듈로 옮긴 화면이다. 시안의 시연용 값은 모두 실제 기능으로 바꿨다. 메인 화면(`/`)과 E2E 시나리오(S1–S9)는 바꾸지 않았다.
-
-| 단계 | 화면 | 연결한 기능·API |
-| --- | --- | --- |
-| 1 대본 준비 | 대본 입력·‘파일 불러오기’(교체 확인·취소), 근거 자료(2,400자), 목표 시간 3·5·10분, 카메라·마이크 선택(`enumerateDevices`, 권한 허용 뒤 이름 표시) | `POST /api/scripts/import`. 대본·근거·장치는 `localStorage dasibom.studio` |
-| 2 발표 연습 | 웹캠 실시간 미리보기(좌우 반전, `video.live-video`), 녹화 시작·일시정지/계속·연습 종료, 경과·남은 시간(200ms 갱신), 마이크 입력 막대 | `MediaCapture.open({ audioDeviceId, videoDeviceId })` → `start({ recordVideo: true })`. 권한 거부·장치 없음이면 안내와 ‘카메라 연결’ 재시도, 시간만 재기 가능 |
-| 3 결과 분석 | 녹화 영상 다시 보기(`video.playback-video`), 타임라인 마커·검토 구간 목록(누르면 해당 시점으로 이동), 발표 시간·평균 속도(음절/분)·긴 침묵, 측정 안내, 대본 위치 확인 카드 | 메인 화면 `analyze()`와 같은 순서: IndexedDB 저장 → `analyzeRecordedSpeech`(`/api/transcribe`) → 다시 저장. 이어서 `POST /api/scripts/align`. `matched`→“맞아요”(`user-confirmed`), 그 밖·다른 문장→직접 선택(`user-selected`) |
-| 4 AI 코칭 | 구간 재생, 선택 문장 강조, 대화(선택지·직접 입력·모르겠어요·설명해 주세요·건너뛰기·취소), 후속 질문 n/3, 대화 요약 | `POST /api/coach/segment`(start → answer/unknown/explain/skip). 409 `history-mismatch`면 처음부터 다시 시작. 요약은 세션 `coaching[itemId]`에 저장 |
-| 5 대본 수정 | 원문/수정안 비교, 직접 편집 → ‘편집 내용 검사’(`checkRevision`), 반영 내용·자료 근거·보존 검사, 바꾸고 싶은 점 선택(needs-confirmation) | `POST /api/scripts/revise-segment`(`request.explicit: true`). `blocked`면 적용 막음. 적용 전 `apply.baseScriptVersionId`·`originalSha256`을 다시 확인하고 대상 문단만 바꾼 새 대본 버전을 만든다(원본 버전 보존) |
-| 6 다시 연습 | 수정 문단만 웹캠으로 부분 연습 → 이전/이번 영상 나란히, 구간 시간·긴 침묵·말하기 속도·군말 후보 표(`[data-testid=practice-compare]`) | 새 세션(`practiceOf` 포함) 저장. 이전 값은 원본 연습에서 이 문단에 연결된 전사 구간 시간(없으면 검토 구간 ±6초)의 `windowMetrics` 어림값 |
-
-스튜디오 세션은 4.1절 세션 형식에 `scriptVersionId`와 `source: { kind: "studio" }`를 더해 저장하므로 `#/history`·`#/result/:id`에서도 보인다. 카메라는 2·6단계에서만 켜고 다른 단계로 가면 끈다.
 
 ## 2. 상태 기계
 
@@ -199,10 +183,7 @@ IndexedDB `speech-coach` / store `sessions`(keyPath `id`)에 세션을 저장한
 | `GET /vendor/mediapipe/*` | `vision_bundle.mjs`(JS), `wasm/vision_wasm_internal.{js,wasm}`(`application/wasm`), `face_landmarker.task`(octet-stream) | 시선 추적. 외부 CDN 없음 |
 | `GET /__health` | `{ status: "ok", releaseId }` | |
 | `POST /api/transcribe` | [영상 불러오기 문서](import-feature.md#서버-api-post-apitranscribe) | 키 없으면 503 |
-| `POST /api/scripts/import` | `multipart/form-data`의 `file` 1개(TXT·PDF·DOCX, 10MB) → `{ fileName, text }`, 오류는 `{ error, message }`. [대본 파일 API 문서](script-import-api.md) | `/studio.html` 1단계에서 사용 |
-| `POST /api/scripts/align` | 검토 지점 ↔ 대본 문장 후보. [문서](script-align-api.md) | `/studio.html` 3단계에서 사용 |
-| `POST /api/coach/segment` | 사용자가 확인한 위치로 구간 코칭. [문서](segment-coach-api.md) | `/studio.html` 4단계에서 사용 |
-| `POST /api/scripts/revise-segment` | 대상 문단 하나의 수정안. [문서](contextual-revision-api.md) | `/studio.html` 5단계에서 사용 |
+| `POST /api/scripts/import` | `multipart/form-data`의 `file` 1개(TXT·PDF·DOCX, 10MB) → `{ fileName, text }`, 오류는 `{ error, message }`. [대본 파일 API 문서](script-import-api.md) | 백엔드만 구현, 화면 연결 전 |
 
 공통 헤더: `Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; media-src 'self' blob:; img-src 'self' data:; connect-src 'self'; …`, `Permissions-Policy: microphone=(self), camera=(self)`. 인라인 `style` 속성은 막히므로 화면 코드는 `el.style.cssText`로 넣는다.
 
@@ -241,7 +222,6 @@ IndexedDB `speech-coach` / store `sessions`(keyPath `id`)에 세션을 저장한
 
 | 메서드 | 변경 |
 | --- | --- |
-| `MediaCapture.open({ audio, video, timeoutMs, audioDeviceId = "", videoDeviceId = "" })` | 장치 ID를 주면 그 장치를 선호로 연다(`exact` 아님: 장치가 빠지면 기본 장치). 없으면 기존과 같다 |
 | `MediaCapture.start({ recordVideo = true })` | `false`면 카메라가 켜져 있어도 소리만 기록 |
 | `MediaCapture.stop({ keepStream = false })` | `true`면 장치를 끄지 않고 미리보기 유지(메인 화면이 사용) |
 | `MediaCapture.release()` | 장치 끄기 |
@@ -269,13 +249,3 @@ IndexedDB `speech-coach` / store `sessions`(keyPath `id`)에 세션을 저장한
 - 구간 다시 연습의 문장 범위는 시간 비율 어림값이다(실제 발화↔대본 대응 아님).
 - 시선 추적과 영상 녹화를 함께 켠 상태에서 드물게 영상 파일이 비어 저장되는 경우가 있다(Edge 5회 중 1회). 원인 조사 중.
 - F14의 되돌리기·조건 이력·여러 회차 비교는 미구현. F7–F12·F15는 기획 단계.
-
-### 스튜디오 4·5·6 연결 보완 (2026-10-30)
-
-- 자동 검토 항목이 없는 경우에도 사용자가 검토 시점을 직접 정해 문장을 선택할 수 있다. `manual`은 사용자가 고른 위치이며 측정 이상으로 표시하지 않는다.
-- 코칭과 수정안은 서버의 실제 공급자 안내 및 전송 동의 후 요청한다. 녹음 전사는 기본으로 꺼져 있고 준비 화면에서 별도로 동의한다.
-- 조각 단위 전사의 `timingPrecision`을 위치 연결에도 유지한다. 수정 적용은 요청 당시 전체 대본·버전·원문 해시와 보존 검사, 사용자의 뜻 확인이 모두 맞아야 한다.
-- 적용 후 ‘수정 전 대본으로 되돌리기’로 원문을 복원하며 기존 연습 기록은 바꾸지 않는다.
-- 기본 연습 화면의 ‘새 스튜디오’ 링크로 `/studio.html`에 접근한다. 기존 메인·기존 채점 시나리오·`docs/problem.yaml`은 유지한다.
-
-검증: 합성 미디어 장치와 가상 대본으로 Docker에서 스튜디오 3→4→5→6, 문단 적용·오래된 수정안 차단·재연습 비교·원문 복원을 확인했다. 실제 Gateway 수정 생성은 최초 400 거절 1회 후 전송 형식 보완으로 성공 1회(입력 473·출력 85토큰), 전사 0회였다. 실제 사람의 발표 분석 정확도와 개선 효과를 검증한 것은 아니다.
