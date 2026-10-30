@@ -19,6 +19,11 @@ jobs:
       E2E_BASE_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Validate submission scenario YAML
+        run: ruby scripts/validate_scenarios.rb
       - name: Start app and database
         run: RELEASE_ID="$GITHUB_SHA" docker compose up -d --build
       - name: Wait for /__health
