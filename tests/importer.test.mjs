@@ -65,7 +65,7 @@ test("transcribeChunks: 모든 조각이 성공하면 시간순 글 조각을 �
   assert.deepEqual(progress.at(-1), [chunks.length, chunks.length])
 })
 
-test("transcribeChunks: 한 번 실패하면 다시 시도하고, 계속 실패한 조각은 partial로 알린다", async () => {
+test("transcribeChunks: 실패한 조각은 자동 재시도하지 않고 partial로 알린다", async () => {
   const samples = tone(65)
   const chunks = planChunks(samples, R)
   let calls = 0
@@ -73,7 +73,7 @@ test("transcribeChunks: 한 번 실패하면 다시 시도하고, 계속 실패�
     concurrency: 1,
     fetchFn: async () => (calls++, errRes(502, { error: "gateway-error" })),
   })
-  assert.equal(calls, chunks.length * 2) // 조각마다 한 번 더 시도
+  assert.equal(calls, chunks.length) // 조각마다 한 번만 전송
   assert.equal(res.status, "partial")
   assert.equal(res.failed.length, chunks.length)
   assert.match(res.message, /글자로 바꾸지 못했어요/)

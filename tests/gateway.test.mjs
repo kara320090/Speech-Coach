@@ -4,7 +4,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { createServer } from "../server.js"
 import { createCoach, createTranscriber } from "../server/coach-provider.js"
-import { classifyGatewayError, createGatewayClient, parseGatewayResponse } from "../server/gateway-client.js"
+import { classifyGatewayError, createGatewayClient, parseGatewayResponse, gatewaySchema } from "../server/gateway-client.js"
 import { encodeWavBytes } from "../public/js/wav.js"
 
 // 기본 검사 중 실제 Gateway·Google로 나가는 요청을 막는다(키가 있어도).
@@ -305,4 +305,22 @@ test("Gateway text-only timestamps survive HTTP and chunk conversion; empty spee
     const tr = createTranscriber({ env: env(), fetchImpl: fakeFetch(() => new Response(JSON.stringify({ text }), { status: 200 })) })
     assert.deepEqual((await tr.run(wavOf(1), signal())).body.segments, [])
   }
+})
+
+
+test("Google Gateway 전송에서 빈 인용 enum을 빼되 실제 인용 검증은 유지한다", async()=>{
+ const schema={type:"object",properties:{quote:{type:"string",enum:[""]},nested:{type:"array",items:{type:"string",enum:["","원문"]}},state:{type:"string",enum:["supported","uncertain"]}}}
+ const out=gatewaySchema(schema,"google/gemini-3.8-flash")
+ assert.equal(out.properties.quote.enum,undefined)
+ assert.match(out.properties.quote.description,/Return the empty string/)
+ assert.equal(out.properties.nested.items.enum,undefined)
+ assert.deepEqual(out.properties.state.enum,["supported","uncertain"])
+ assert.deepEqual(schema.properties.quote.enum,[""])
+ assert.deepEqual(gatewaySchema(schema,"anthropic/claude-haiku-5.5"),schema)
+ const good=fakeFetch(()=>chat({...OUT.rewrite,sourceQuote:""}))
+ await createCoach({env:env(),fetchImpl:good}).run(sample({task:"rewrite",sources:""}),signal())
+ assert.equal(JSON.parse(good.calls[0].init.body).response_format.json_schema.schema.properties.sourceQuote.enum,undefined)
+ const bad=fakeFetch(()=>chat({...OUT.rewrite,sourceQuote:"자료에 없는 인용"}))
+ await assert.rejects(createCoach({env:env(),fetchImpl:bad}).run(sample({task:"rewrite",sources:""}),signal()),{code:"invalid-output"})
+ assert.equal(bad.calls.length,1)
 })

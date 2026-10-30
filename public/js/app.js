@@ -299,6 +299,7 @@ function renderHeader() {
       h(
         "nav",
         { "aria-label": "주 메뉴" },
+        h("a", { href: "/studio.html", "aria-disabled": b ? "true" : null }, "새 스튜디오"),
         h("a", { href: "/coach.html", "aria-disabled": b ? "true" : null }, "대본 이해 연습"),
         h("a", { id: "nav-import", href: "/import.html", "aria-disabled": b ? "true" : null }, "영상 불러오기"),
         h("a", { id: "nav-history", href: "#/history", "aria-disabled": b ? "true" : null }, "연습 기록"),
@@ -1015,6 +1016,7 @@ function renderResults() {
       { class: "btn-row" },
       h("button", { type: "button", class: "btn btn-primary", id: "btn-again", onclick: againSameCondition }, "같은 조건으로 다시 연습"),
       h("a", { href: "#/history" }, "연습 기록 보기"),
+      session.audioBlob && h("a", { href: `/studio.html?session=${encodeURIComponent(session.id)}` }, "스튜디오에서 음성 인식 확인"),
     ),
   )
   fillCompare(session, compareHost)
