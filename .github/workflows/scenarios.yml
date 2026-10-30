@@ -52,7 +52,22 @@ jobs:
           fi
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 22
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check planning contracts and generated canvas
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/check_submission.py
+          python tools/render_problem_canvas.py --check
+      - name: Run unit tests without provider keys
+        env:
+          AI_GATEWAY_API_KEY: ''
+          GEMINI_API_KEY: ''
+        run: |
+          npm ci --omit=optional --no-audit --no-fund
+          node --test --test-concurrency=1
       - name: Run scenario E2E
         working-directory: e2e
         run: |
