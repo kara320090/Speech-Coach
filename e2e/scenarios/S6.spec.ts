@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test'
 import path from 'node:path'
 test.setTimeout(60_000)
 // The supplied clip uses real transcription and MediaPipe through the product UI.
-test('S6 실제 발표 영상 파일의 소리와 눈 깜빡임을 이 기기에서 분석한다',async({page})=>{
+test('S6 실제 영상 파일을 불러와 전사·말하기 속도·군말 후보·눈 깜빡임 결과를 확인한다',async({page})=>{
  const errors:string[]=[];let aiPosts=0;const assets=new Set<string>()
  page.on('response',r=>{if(r.ok()&&/\/vendor\/mediapipe\//.test(r.url()))assets.add(r.url())})
  page.on('pageerror',e=>errors.push(e.message))
@@ -11,6 +11,7 @@ test('S6 실제 발표 영상 파일의 소리와 눈 깜빡임을 이 기기에
  await page.getByRole('button',{name:'바로 서비스 이용하기',exact:true}).click()
  await page.getByRole('link',{name:'영상 불러오기',exact:true}).click()
  await page.getByLabel('영상 또는 소리 파일').setInputFiles(path.join(__dirname,'../fixtures/presentation-review.mp4'))
+ await page.getByLabel('목표 시간 분').fill('0')
  await page.getByLabel('목표 시간 초').fill('18')
  await page.getByLabel('글자로도 바꿔서 말하기 속도·반복 표현 분석').check()
  await page.getByLabel('영상 눈 깜빡임도 이 기기에서 분석').check()
@@ -20,10 +21,15 @@ test('S6 실제 발표 영상 파일의 소리와 눈 깜빡임을 이 기기에
  const data=await response.json();expect(data.text.trim().length).toBeGreaterThan(0)
  await expect(page.getByRole('region',{name:'연습 결과'})).toBeVisible({timeout:110000})
  await expect(page.getByTestId('total')).toContainText('0:17')
+ await expect(page.getByTestId('target')).toHaveText('0:18')
  await expect(page.getByTestId('blink-status')).toContainText('총')
  await expect(page.getByTestId('blink-status')).toContainText('분당')
  await expect(page.locator('video#player')).toHaveAttribute('src',/^blob:/)
  await expect(page.getByTestId('avg-speed')).toContainText(/\d+.*음절/)
+ await expect(page.getByRole('region',{name:'연습 결과'}).locator('.stat').filter({hasText:'군말(음, 어)'}).locator('dd')).toHaveText(/^\d+회$/)
+ const transcript=page.locator('details').filter({has:page.getByText(/^인식된 글 보기/)})
+ await transcript.locator('summary').click()
+ await expect(transcript.getByRole('listitem').first()).toContainText(data.text.trim())
  expect(aiPosts).toBe(1)
  expect([...assets].some(url=>url.endsWith('face_landmarker.task'))).toBe(true)
  expect([...assets].some(url=>url.endsWith('.wasm'))).toBe(true)

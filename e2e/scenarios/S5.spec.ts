@@ -6,6 +6,7 @@ test('S5 확인한 대본 위치에서 대화하고 수정안을 확인·적용�
  const errors:string[]=[];let transcriptions=0;page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().endsWith('/api/transcribe')&&r.method()==='POST')transcriptions++})
  await page.goto('/');await page.getByRole('button',{name:'바로 서비스 이용하기'}).click()
  await page.getByLabel('발표 대본').fill(SCRIPT)
+ await page.getByRole('checkbox',{name:/녹음 소리를 AI로 전사하는 데 동의해요/}).uncheck()
  await page.getByRole('button',{name:'카메라 확인하기'}).click()
  await page.getByRole('button',{name:'녹화 시작'}).click()
  await page.waitForTimeout(1200)
