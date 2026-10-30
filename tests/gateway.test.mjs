@@ -312,6 +312,7 @@ test("Google Gateway 전송에서 빈 인용 enum을 빼되 실제 인용 검증
  const schema={type:"object",properties:{quote:{type:"string",enum:[""]},nested:{type:"array",items:{type:"string",enum:["","원문"]}},state:{type:"string",enum:["supported","uncertain"]}}}
  const out=gatewaySchema(schema,"google/gemini-3.8-flash")
  assert.equal(out.properties.quote.enum,undefined)
+ assert.match(out.properties.quote.description,/Return the empty string/)
  assert.equal(out.properties.nested.items.enum,undefined)
  assert.deepEqual(out.properties.state.enum,["supported","uncertain"])
  assert.deepEqual(schema.properties.quote.enum,[""])
